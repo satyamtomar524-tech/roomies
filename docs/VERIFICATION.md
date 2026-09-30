@@ -1,18 +1,21 @@
 # Verification record
 
-Checked on 30 September 2026 for Roomies 2.1. This records local evidence. Remote results are available in the repository's [workflow run history](https://github.com/satyamtomar524-tech/roomies/actions).
+Checked on 30 September 2026 for Roomies 2.2. This records local evidence. Remote results are available in the repository's [workflow run history](https://github.com/satyamtomar524-tech/roomies/actions).
 
 ## Results
 
 | Check | Result |
 |---|---|
-| Python behavioral suite | **182 passed** on Python 3.12.14 / Windows |
+| Python behavioral suite | **186 passed** on Python 3.12.14 / Windows |
 | JavaScript syntax | Passed with Node 24.19.0 |
 | Complete browser workflow | Passed using Playwright 1.62.1 and isolated headless Chrome 154.0.8037.58 |
 | Responsive pages | No horizontal overflow in all seven views at 320 px and 390 px; expense, repayment and monthly-bill dialog controls remain reachable |
 | Browser runtime | No uncaught page errors in the tested workflow |
+| Public static build | Passed using self-hosted Pyodide 314.0.7 / Python 3.14.2; the browser made no HTTP API or external requests |
+| Browser storage | Saves survive reload; independent visitors have separate records; a second editor tab is blocked; a simulated IndexedDB write failure restores the previous database |
+| Browser exports and costs | Full JSON backup/restore, price records, repayments and monthly-bill workflow passed through the static transport |
 | Visual inspection | Desktop and mobile home, room and kitchen screens, a narrow expense dialog, and a clearly fictional shared-cost example inspected |
-| Python distribution | Version 2.1 wheel built and installed into a fresh virtual environment; all seven web assets, installed HTTP server and Roomies CLI verified outside the source checkout |
+| Python distribution | Version 2.1 wheel was checked in the previous release; the 2.2 local source workflow passed. A fresh 2.2 wheel installation has not been checked |
 
 The Python suite covers geometry, prices, HTTP/API routes, SQLite persistence, scheduling, household validation and shared expenses. The browser check uses a fresh disposable database, synthetic belongings, people, bills, products and prices, and a stopped scheduler. It does not contact a retailer or modify the user's workspace.
 
@@ -21,6 +24,8 @@ The browser workflow checks dragging, keyboard movement and rotation, numeric ro
 It also creates flat members, adds and edits a belonging's location, searches inventory, blocks deletion of a referenced member, updates the kitchen checklist, creates/edits/removes shared costs, verifies exact balances, exports per-person shares and restores the full flat. A held background response verifies that a newly saved change survives an older read. A held checklist write verifies that import waits before restoring the backup. A bill imported with a different participant order verifies that a title-only edit preserves its odd-cent allocation.
 
 The completed cost workflow records, edits and removes a partial repayment, records the full amount to clear the balance, exports repayments, creates a monthly template without adding spending, records its reviewed bill, prevents another entry for the same month, changes the template without rewriting the old expense, pauses/resumes it, and restores both new lists from a full backup.
+
+The public build reuses that cost workflow and tests the browser-only transport separately. It verifies room movement and suggested placements, inventory, kitchen restocking, manual product quotes, backup download/import, browser persistence, visitor isolation, one-editor-tab protection and rollback after simulated storage exhaustion. All seven views pass the 320 px and 390 px width check. The optional WebMCP overview was checked through a mock registration; real agent/browser integration remains unverified. See [browser hosting](BROWSER_HOSTING.md) for the build and test commands.
 
 ## Repeat the checks
 

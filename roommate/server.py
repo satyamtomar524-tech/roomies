@@ -66,7 +66,7 @@ class RoomMateServer(ThreadingHTTPServer):
 
 class RequestHandler(BaseHTTPRequestHandler):
     server: RoomMateServer
-    server_version = "Roomies/2.1"
+    server_version = "Roomies/2.2"
 
     def log_message(self, format, *args):
         # Keep request bodies, room details and shopping URLs out of logs.

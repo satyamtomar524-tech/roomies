@@ -1,4 +1,4 @@
-/* Roomies keeps room positions in centimetres. The server owns validation and prices. */
+/* Roomies keeps room positions in centimetres. Python validates records and prices. */
 "use strict";
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -114,6 +114,7 @@ function friendlyDate(value) {
 }
 
 async function api(path, options = {}) {
+  if (window.roomiesBrowser) return window.roomiesBrowser.request(path, options);
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json" },
     ...options,
@@ -1747,7 +1748,8 @@ async function downloadData(path) {
   try {
     await flushRoom();
     await flushFlat();
-    window.location.href = path;
+    if (window.roomiesBrowser) await window.roomiesBrowser.download(path);
+    else window.location.href = path;
   } catch (error) {
     toast(
       `Export stopped because your latest changes could not be saved. ${error.message}`,
@@ -2333,6 +2335,10 @@ function renderTracker() {
   const root = $("#tracker-status");
   root.replaceChildren();
   const tracker = state.tracker || {};
+  if (tracker.mode === "browser") {
+    root.append(node("p", {}, tracker.description));
+    return;
+  }
   root.append(
     append(
       node("p"),
@@ -2752,7 +2758,7 @@ async function start() {
     setInterval(pollWorkspace, 30000);
   } catch (error) {
     $("#load-error").textContent =
-      `Could not load the workspace. ${error.message} Refresh once the local server is running.`;
+      `Could not load the workspace. ${error.message}${window.roomiesBrowser ? "" : " Refresh once the local server is running."}`;
     $("#load-error").hidden = false;
     setSaveStatus("Workspace unavailable", "error");
   }

@@ -6,9 +6,11 @@ Use the description after reviewing the parts you will discuss. The implementati
 
 **Roomies — student flat companion**
 
-Python · SQLite · JavaScript · SVG · HTTP APIs
+Python · SQLite · JavaScript · SVG · HTTP APIs · WebAssembly
 
-A local application that combines measured room planning, belongings with storage locations, kitchen stock lists, shared expenses, repayments, monthly bill templates and a product price journal. It validates saved inputs, calculates shared balances in integer cents, preserves dated price evidence and separates item-price changes from delivered-price target alerts.
+An application that combines measured room planning, belongings with storage locations, kitchen stock lists, shared expenses, repayments, monthly bill templates and a product price journal. It validates saved inputs, calculates shared balances in integer cents, preserves dated price evidence and separates item-price changes from delivered-price target alerts.
+
+A static browser build runs the same Python rules through Pyodide and persists each visitor's SQLite database in IndexedDB. It can be shared without installing Python or exposing a public write API. The local Python server remains available for compatible retailer checks.
 
 Automated tests cover the implemented rules and failure cases. Browser checks exercise room editing, household records, kitchen updates, expense balances and backup flows. No actual users, savings or productivity improvement have been measured.
 

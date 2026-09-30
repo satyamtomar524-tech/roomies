@@ -1,0 +1,40 @@
+.browser-note {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 26px;
+  margin-bottom: 24px;
+  border: 1px solid #d5e3d8;
+  border-radius: 16px;
+  background: #edf3ee;
+}
+.browser-note strong {
+  font-size: 1.06rem;
+}
+.browser-note p {
+  margin: 7px 0 0;
+  max-width: 660px;
+  line-height: 1.6;
+}
+.browser-note button {
+  flex-shrink: 0;
+}
+#browser-loading {
+  font-size: 0.8rem;
+  color: #52675a;
+}
+.product-watch-row,
+#check-all,
+#journal-check-all,
+#product-form label:has([name="monitor"]) {
+  display: none;
+}
+@media (max-width: 650px) {
+  .browser-note {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+  }
+}

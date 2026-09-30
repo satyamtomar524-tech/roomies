@@ -4,7 +4,9 @@ Roomies has six areas. Pick the page for the task you want to do; you do not nee
 
 ## Get started
 
-Run `python -m roommate` from the project directory, or `start.ps1` on Windows. Open the printed local address. The code keeps the original Python module name for compatibility.
+Open the public website to try Roomies without installing anything. It saves in your current browser; Export keeps a backup. Sharing the link gives each friend their own workspace, with no live synchronization.
+
+For the local Python app, run `python -m roommate` from the project directory, or `start.ps1` on Windows. Open the printed local address. The code keeps the original Python module name for compatibility.
 
 - **Home:** a short overview and shortcuts.
 - **My room:** the measured room plan. Start with the sample, then enter your actual walls, openings and furniture.

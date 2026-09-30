@@ -21,6 +21,12 @@ Then the idea got bigger. I also wanted to remember where I kept my things, chec
 
 The room starts with a clearly labelled **3 × 3.5 m sample**. It is there to try the planner. Replace it with your measurements when you are ready. The flat starts empty, with one placeholder person called Me.
 
+## Open it in your browser
+
+The public browser version lets friends try Roomies without installing Python. Each person gets their own workspace, saved on that device. The Share Roomies button shares the website, not your records. Export a backup before clearing browser data or changing devices.
+
+Room planning, flat and kitchen lists, shared costs, repayments, monthly bills and manual price records work in the browser. It has no shared accounts or live sync between flatmates. Automatic retailer checks remain a feature of the local app below.
+
 ## Run it
 
 You need Python 3.10 or newer. The app itself uses Python's standard library, so there is no API key or database server to set up.
@@ -45,7 +51,7 @@ For rent or internet, save a monthly bill once. When it is paid, open the saved 
 
 ## How I built it
 
-Python handles the rules and local HTTP API. SQLite stores the records. Plain JavaScript handles the forms, and SVG draws the room. Shared amounts are stored as whole cents so rounding cannot lose money.
+Python handles the rules and local HTTP API. SQLite stores the records. Plain JavaScript handles the forms, and SVG draws the room. Shared amounts are stored as whole cents so rounding cannot lose money. The public build uses Pyodide to run those same Python rules in a browser worker and saves the database in IndexedDB.
 
 The idea and requirements are mine. I used coding assistance to build and review the implementation. I have kept the code, tests and guide together so I can understand the decisions and learn from the project.
 
@@ -62,11 +68,13 @@ Browser checks are optional development tools. Their setup is in the verificatio
 
 ## What this version covers
 
-- It runs locally on one computer. Flatmate names are labels, so there are no shared logins or live phone-to-phone updates. Repayments are records of payments you made yourself.
+- The local app stores data on one computer; the public website stores it in each visitor's browser. Flatmate names are labels, so there are no shared logins or live phone-to-phone updates. Repayments are records of payments you made yourself.
 - The room is a rough rectangular plan with dimension and clearance checks. Colours are schematic; it is not a construction drawing or a 3D rendering.
 - Live price checks work only with compatible public product pages that permit crawling. No real retailer has been demonstrated as compatible yet. Manual price records work independently. Blank shipping stays unknown, and checks run only while the server is open.
 
 Use the data menu for a complete backup. It includes bills, repayments and monthly templates as well as the room and flat. Keep your actual backups private; runtime databases are excluded from Git. [Data and rules](docs/DATA_AND_RULES.md) explains older backup formats and price evidence.
+
+To build the shareable version yourself, see [browser hosting](docs/BROWSER_HOSTING.md).
 
 ## References
 

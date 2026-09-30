@@ -1,6 +1,6 @@
 # How the project is put together
 
-Roomies is one local application with a room plan and a separate flat base. The browser draws the room and collects household inputs. Python validates the inputs, applies the planning and expense rules, and stores the records in SQLite.
+Roomies has a room plan and a separate flat base. The browser draws the room and collects household inputs. Python validates the inputs, applies the planning and expense rules, and stores the records in SQLite. There are two transports: the original localhost HTTP server and a device-local public browser build using Pyodide. [Browser hosting](BROWSER_HOSTING.md) explains the second path.
 
 ```mermaid
 flowchart LR
@@ -27,6 +27,9 @@ flowchart LR
 | `roommate/pricing.py` | Product/observation validation, fit and target evaluation, structured-offer parsing, restricted public HTTP fetching |
 | `roommate/storage.py` | SQLite schema, transactions, room and product records, price history, deduplicated notifications, import/export |
 | `roommate/server.py` | HTTP routes, request limits, localhost access checks, static files, scheduled checks |
+| `roommate/browser.py` | Browser action dispatch using the same validation and storage, without retailer network calls |
+| `web/browser.js` / `browser-worker.mjs` | Worker transport, one-tab protection, Pyodide and durable browser saves |
+| `scripts/build_browser.py` | Pinned runtime verification and an allowlisted, private-data-free static build |
 | `roommate/tracker.py` | Opted-in checks, per-product due times, bounded cycles, clean worker shutdown |
 | `web/index.html` | Accessible controls and page structure |
 | `web/app.js` | Selection, drawing, dragging, editing, API requests, journal rendering, export/import controls |

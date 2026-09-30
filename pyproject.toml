@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roomies-student-flat"
-version = "2.1.0"
-description = "A local student flat companion for room planning, belongings, kitchen lists and shared costs."
+version = "2.2.0"
+description = "A student flat companion for room planning, belongings, kitchen lists and shared costs."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

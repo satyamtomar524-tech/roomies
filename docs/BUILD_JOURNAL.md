@@ -1,5 +1,11 @@
 # Build journal
 
+## 30 September 2026 — A website to share
+
+I wanted friends to open the project without setting up Python. The browser version runs the existing rules with Pyodide and keeps each visitor's SQLite database in IndexedDB. This avoids maintaining two different geometry and expense engines. I kept manual price records in this version and left automatic retailer requests in the local app.
+
+The public build starts with the sample, includes a Share Roomies button and makes the storage boundary clear. It checks persistence before calling an edit saved, and allows one editor tab so a stale tab cannot overwrite the database. Browser tests cover isolated visitors, reloads, backups and storage failure as well as the everyday workflows.
+
 ## 30 September 2026 — Finishing the everyday flow
 
 I wanted the shared-cost page to finish the job: add a bill, see who owes what, then record the money paid back. Repayments now change the balance without counting as more spending.
