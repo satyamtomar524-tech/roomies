@@ -26,7 +26,7 @@ from urllib.robotparser import RobotFileParser
 import uuid
 
 
-USER_AGENT = "RoomMate/1.0 (local student-room price journal)"
+USER_AGENT = "Roomies/2.0 (local student-flat price journal)"
 MAX_BYTES = 2 * 1024 * 1024
 MAX_REDIRECTS = 3
 MAX_QUOTE_AGE = timedelta(hours=24)

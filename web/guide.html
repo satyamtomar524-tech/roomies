@@ -1,162 +1,77 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>RoomMate · How this works</title>
-    <link rel="stylesheet" href="/guide.css" />
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Roomies · Quick guide</title>
+    <link rel="stylesheet" href="/guide.css">
   </head>
   <body>
-    <header><a class="wordmark" href="/">roommate</a><a href="/">← Back to my room</a></header>
+    <header><a class="wordmark" href="/">Roomies</a><a href="/">← Back to Home</a></header>
     <main>
-      <p class="eyebrow">A GUIDE YOU CAN COME BACK TO</p>
-      <h1>A place for every thing.<br />A reason for every decision.</h1>
-      <p class="intro">
-        RoomMate brings your room map and your shopping notes into the same workspace. Here is what
-        happens, and what you need to check yourself.
-      </p>
+      <p class="eyebrow">QUICK GUIDE</p>
+      <h1>One place for the flat.</h1>
+      <p class="intro">Pick one task. Your room, belongings, kitchen and shared costs have their own simple pages.</p>
       <nav aria-label="Guide contents">
-        <a href="#room">Map the room</a><a href="#places">Reserve a place</a
-        ><a href="#finds">Add a find</a><a href="#prices">Keep a price journal</a
-        ><a href="#code">Understand the project</a>
+        <a href="#flat">Find my things</a>
+        <a href="#kitchen">Kitchen checklist</a>
+        <a href="#costs">Split a bill</a>
+        <a href="#room">Plan my room</a>
+        <a href="#upgrades">Track an upgrade</a>
       </nav>
-
-      <section id="room">
+      <section id="flat">
         <span class="step">01</span>
         <div>
-          <h2>Start with measurements.</h2>
-          <p>
-            The first room is a labeled 300 × 350 cm sample. Its area is 10.5 m². Enter your own
-            wall dimensions before relying on placements. Measure the full bed frame, desk, and
-            wardrobe, including parts that stick out.
-          </p>
-          <p>
-            Room settings hold the dimensions and the positions of doors, windows, and fixed
-            obstacles. Confirm the measurements only after checking the actual room; a sample room
-            cannot produce buying alerts. Wall and floor colours give a schematic preview, not a
-            material or lighting simulation.
-          </p>
-          <p>
-            The plan uses the upper-left corner as its origin: X goes right, Y goes down. A position
-            of X = 20, Y = 100 starts 20 cm from the left wall and 100 cm from the top wall.
-          </p>
-          <p>
-            Dragging and numeric controls update the same coordinates. Rotation is 0° or 90°.
-            RoomMate saves locally and shows whether the save succeeded.
-          </p>
+          <h2>Know where things are.</h2>
+          <p>In My flat, add a belonging, its owner, room and exact spot. For example: Kettle → Kitchen → Worktop beside the sink. Choose Shared for things everyone uses.</p>
+          <p>Search by name or location later. Belongings do not need measurements. Add flatmates in flat settings before assigning an owner.</p>
         </div>
       </section>
-      <section id="places">
+      <section id="kitchen">
         <span class="step">02</span>
         <div>
-          <h2>Separate what you own from what comes later.</h2>
-          <p>
-            Owned floor furniture uses a solid outline. A planned item uses a dashed outline and
-            reserves its space. Give it the largest dimensions you are comfortable buying.
-          </p>
-          <p>
-            A floor item occupies space. A surface item, such as a lamp, belongs to a supporting
-            desk or cabinet. Its position is measured inside that surface. An overlay, such as a
-            rug, can sit beneath furniture. Wall items are marked separately and do not occupy floor
-            area.
-          </p>
-          <p>
-            Overlap, room-boundary, fixed-obstacle, and inward-door checks flag measured conflicts.
-            Preferred clearance is your setting, not a building standard. Suggested positions use a
-            small search and explain the rule behind the option; they do not prove that a whole room
-            is optimal.
-          </p>
+          <h2>Check the kitchen.</h2>
+          <p>Pans and kettles belong in the flat inventory. Food goes in the Fridge, Freezer or Pantry list. Add an amount such as “1 carton” and mark it Stocked, Low or Out.</p>
+          <p>Low and Out items form a shopping checklist. Optional best-before dates help organize what to check; the app cannot assess food safety from those dates.</p>
         </div>
       </section>
-      <section id="finds">
+      <section id="costs">
         <span class="step">03</span>
         <div>
-          <h2>Give every find a reserved place.</h2>
-          <p>
-            Add the exact product link, its dimensions, the chosen size or finish, and a
-            delivered-price target. Link it to the planned item it would replace. The fit check
-            compares the product with that reservation, including the allowed 90° orientation.
-          </p>
-          <p>
-            For automatic price-drop notices, enter the retailer SKU and confirm the saved variant.
-            The fetched SKU, requested link and current product identity must match. A name alone
-            does not confirm the variant.
-          </p>
-          <p>
-            If the dimensions or variant are not confirmed, the result stays incomplete. A product
-            being smaller than a slot does not prove assembly access, load capacity, comfort, or
-            suitability for its intended use.
-          </p>
+          <h2>Split a shared bill.</h2>
+          <p>In Shared costs, enter the title, date and amount. Select who paid and the people sharing it. Someone can pay for others without taking a share.</p>
+          <p>Positive balances mean money owed to a person; negative balances mean money they owe. Splits keep every cent: €20.00 divided three ways is €6.67, €6.67 and €6.66.</p>
+          <p>Suggested payments explain how to balance the recorded bills. They do not send money or record a completed bank transfer.</p>
         </div>
       </section>
-      <section id="prices">
+      <section id="room">
         <span class="step">04</span>
         <div>
-          <h2>Keep the evidence with the price.</h2>
-          <p>
-            Record the item price, shipping, stock, exact variant, source link, and time. Enter zero
-            shipping only when it is confirmed free. A blank shipping amount means unknown.
-          </p>
-          <p>
-            The journal keeps observations instead of overwriting the past. Delivered price is item
-            price plus confirmed shipping. An in-app target alert requires a confirmed room and fit,
-            an available exact variant, a fresh observation, and a delivered price at or below your
-            target. Missing facts stay visible.
-          </p>
-          <p>
-            A lower item price can produce a separately labeled informational notice. Unknown
-            delivery still prevents a delivered-price recommendation. The first quote and an
-            unchanged price do not create a drop notice.
-          </p>
-          <p>
-            A live check reads public structured Product and Offer data on supported pages and
-            leaves delivery unknown. It does not sign in, use your shopping account, or bypass
-            blocked pages. Pages with multiple offers, missing data, or unsupported currencies need
-            a manual observation. Scheduled checks run only while the local server is open and the
-            product's monitoring is enabled.
-          </p>
-          <p>
-            RoomMate helps you decide. You open the retailer link and make the final purchase
-            yourself.
-          </p>
+          <h2>Arrange the room.</h2>
+          <p>My room begins with a labeled 300 × 350 cm sample. Enter your actual room, door, window and furniture measurements before relying on it. The flat list and room plan remain separate.</p>
+          <p>Select an item and drag it, edit X/Y or rotate it. Arrow keys move by 5 cm; R rotates. More details contains the less frequent controls. Solid items are owned; dashed items reserve a future place.</p>
+          <p>A lamp can sit on a supporting desk. A rug can overlap floor furniture. Room checks flag modeled overlaps, boundaries and access zones. This is a rectangular concept plan, not a professional survey.</p>
         </div>
       </section>
-      <section id="code">
+      <section id="upgrades">
         <span class="step">05</span>
         <div>
-          <h2>Follow one action through the code.</h2>
-          <div class="code-path">
-            <span>Browser interface</span><b>→</b><span>Python API</span><b>→</b
-            ><span>Fit and price rules</span><b>→</b><span>SQLite records</span>
-          </div>
-          <p>
-            <code>web/app.js</code> handles the visible controls and sends JSON requests.
-            <code>roommate/server.py</code> receives them. <code>geometry.py</code> checks the room
-            and placements. <code>pricing.py</code> checks products and price evidence.
-            <code>storage.py</code> keeps the room, products, observations, and notifications.
-          </p>
-          <p>
-            When you move a desk, the browser changes its X and Y, the server validates the data,
-            geometry checks the new placement, and SQLite saves it. A later price check uses that
-            same saved reservation.
-          </p>
-          <p>
-            The repository's <code>docs/PROJECT_GUIDE.md</code> and
-            <code>docs/ARCHITECTURE.md</code> explain the files and rules in more detail. Tests in
-            <code>tests/</code> check the important behaviors. The verification document records
-            what was actually run.
-          </p>
+          <h2>Check an upgrade before buying.</h2>
+          <p>In Upgrades, link an exact product to a reserved room place. Enter its dimensions and a delivered-price target. Record the price, delivery, stock, source, time and variant check.</p>
+          <p>Blank delivery means unknown. An item-price change is different from a confirmed delivered-price target alert. Automatic checks work only for compatible public pages; unsupported stores can be recorded manually.</p>
+          <p>A confirmed saved SKU and matching product link are needed for live variant confidence. Checks run while the local server is open. The sample room cannot produce buying alerts.</p>
         </div>
       </section>
       <aside>
-        <h2>Keep your actual room private.</h2>
-        <p>
-          Your runtime database is excluded from Git. Exported backups can contain measurements,
-          product links, and notes. The public repository contains source and sample fixtures;
-          review any backup before sharing it.
-        </p>
+        <h2>Your records stay local.</h2>
+        <p>Member names are labels in one local workspace, not accounts or invitations. Current backups include the room and flat. Old room-only imports leave flat records unchanged. Keep actual backups private.</p>
       </aside>
+      <details class="project-details">
+        <summary>How the project works</summary>
+        <p>The browser sends JSON to <code>roommate/server.py</code>. <code>household.py</code> validates belongings and kitchen records. <code>expenses.py</code> splits exact cents. <code>geometry.py</code> checks the room. <code>pricing.py</code> checks price evidence. <code>storage.py</code> saves everything in SQLite.</p>
+        <p>Start with <code>docs/PROJECT_GUIDE.md</code> in the repository, then follow one action through the code. The tests and verification record show what was checked.</p>
+      </details>
     </main>
-    <footer>RoomMate · Student room planner and upgrade journal · Satyam Tomar</footer>
+    <footer>Roomies · Student flat companion · Satyam Tomar</footer>
   </body>
 </html>

@@ -1,32 +1,40 @@
 # GitHub project
 
-Public repository: [satyamtomar524-tech/roommate](https://github.com/satyamtomar524-tech/roommate).
+Public repository: [satyamtomar524-tech/roomies](https://github.com/satyamtomar524-tech/roomies).
 
-The repository contains source, tests, documentation and an illustrative room. Runtime databases, actual room backups, credentials and logs are excluded. Check `git status` before publishing any future change.
+The project was renamed from RoomMate. The repository contains source, tests, documentation and sample setup data. Actual room databases, belongings, groceries and expense records are excluded from Git.
 
 ## Get a working copy
 
 ```sh
-git clone https://github.com/satyamtomar524-tech/roommate.git
-cd roommate
+git clone https://github.com/satyamtomar524-tech/roomies.git
+cd roomies
 python -m roommate
 ```
 
-Or extract the source ZIP and run from its directory. A ZIP does not include Git history.
+The Python module keeps its original name for compatibility. The app and repository are called Roomies. The installed package also exposes `roomies`.
+
+If you already cloned the previous repository, update its remote:
+
+```sh
+git remote set-url origin https://github.com/satyamtomar524-tech/roomies.git
+git pull
+```
 
 ## Publish your next change
 
-Use your GitHub-authenticated working copy. Make a small change and run the relevant checks first:
+Make a small change and run the relevant checks first:
 
 ```sh
 python -m unittest discover -s tests -v
 node --check web/app.js
+node --check web/flat.js
 git status
 git add PATH-TO-YOUR-CHANGED-FILE
 git commit -m "Describe the change"
 git push
 ```
 
-Replace the placeholder with the specific file you changed. Keep real room backups private. The repository uses a GitHub noreply commit address so a personal email is not embedded in its commit history.
+Replace the placeholder with your changed file. Keep actual backups private. This repository uses a GitHub noreply commit address.
 
-The workflow checks Python 3.10, 3.12 and 3.13, JavaScript syntax, and the complete Chromium workflow. Its [run history](https://github.com/satyamtomar524-tech/roommate/actions) is the evidence for remote results.
+The [workflow history](https://github.com/satyamtomar524-tech/roomies/actions) records remote checks.

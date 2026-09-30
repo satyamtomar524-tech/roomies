@@ -1,2 +1,2 @@
-"""RoomMate: a local room planner and upgrade journal."""
-__version__ = "1.0.0"
+"""Roomies: room planning, flat belongings, kitchen lists and shared costs."""
+__version__ = "2.0.0"

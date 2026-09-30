@@ -1,10 +1,13 @@
-/* RoomMate's browser keeps positions in centimetres. The server owns validation and prices. */
+/* Roomies keeps room positions in centimetres. The server owns validation and prices. */
 "use strict";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const SVG_NS = "http://www.w3.org/2000/svg";
-const euro = new Intl.NumberFormat("en-DE", { style: "currency", currency: "EUR" });
+const euro = new Intl.NumberFormat("en-DE", {
+  style: "currency",
+  currency: "EUR",
+});
 const number = new Intl.NumberFormat("en-DE", { maximumFractionDigits: 2 });
 let state = null;
 let selectedId = null;
@@ -18,7 +21,7 @@ let toastTimer = null;
 let importCandidate = null;
 let dragging = null;
 let settingsOpenings = [];
-let currentView = "room";
+let currentView = "home";
 let productEditId = null;
 
 function node(tag, attributes = {}, text = null) {
@@ -36,7 +39,8 @@ function node(tag, attributes = {}, text = null) {
 
 function svgNode(tag, attributes = {}, text = null) {
   const element = document.createElementNS(SVG_NS, tag);
-  for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
+  for (const [key, value] of Object.entries(attributes))
+    element.setAttribute(key, value);
   if (text !== null) element.textContent = text;
   return element;
 }
@@ -49,10 +53,14 @@ function formValue(form, key) {
   return form.elements.namedItem(key).value;
 }
 function nullableNumber(value) {
-  return value === "" || value === null || value === undefined ? null : Number(value);
+  return value === "" || value === null || value === undefined
+    ? null
+    : Number(value);
 }
 function money(value) {
-  return value === null || value === undefined || !Number.isFinite(Number(value))
+  return value === null ||
+    value === undefined ||
+    !Number.isFinite(Number(value))
     ? "Not known"
     : euro.format(Number(value));
 }
@@ -120,7 +128,9 @@ async function api(path, options = {}) {
     );
   }
   if (!response.ok)
-    throw new Error(data.error || data.message || `Request failed (${response.status}).`);
+    throw new Error(
+      data.error || data.message || `Request failed (${response.status}).`,
+    );
   return data;
 }
 
@@ -164,7 +174,10 @@ async function flushRoom() {
       const revision = mutationRevision;
       const payload = JSON.parse(JSON.stringify(state.room));
       try {
-        const result = await api("/api/room", { method: "PUT", body: JSON.stringify(payload) });
+        const result = await api("/api/room", {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
         savedRevision = revision;
         if (revision === mutationRevision) {
           state.summary = result.summary || result.analysis || state.summary;
@@ -173,6 +186,7 @@ async function flushRoom() {
           renderInventory();
           renderItemIssues();
           renderPlan();
+          renderHome();
         }
       } catch (error) {
         setSaveStatus("Not saved · try your edit again", "error");
@@ -191,7 +205,10 @@ async function flushRoom() {
         renderJournal();
       }
     } catch {
-      toast("Your room was saved. The wishlist refresh failed; refresh the page to retry.", true);
+      toast(
+        "Your room was saved. The wishlist refresh failed; refresh the page to retry.",
+        true,
+      );
     }
   })();
   try {
@@ -203,15 +220,41 @@ async function flushRoom() {
 
 async function reload() {
   await flushRoom();
-  state = await api("/api/state");
+  await flushFlat();
+  const roomVersion = mutationRevision,
+    flatVersion = flatRevision;
+  const refreshed = await api("/api/state");
+  // A read started before a write must not replace that write's accepted state.
+  if (state && (roomVersion !== mutationRevision || savingPromise)) {
+    refreshed.room = state.room;
+    refreshed.summary = state.summary;
+  }
+  if (state && (flatVersion !== flatRevision || flatSavingPromise)) {
+    refreshed.flat = state.flat;
+    refreshed.flat_summary = state.flat_summary;
+  }
+  state = refreshed;
   state.products ||= [];
   state.notifications ||= [];
   if (!itemById(selectedId)) selectedId = state.room.items[0]?.id || null;
   renderAll();
+  showView(currentView);
   setSaveStatus("All changes saved locally");
 }
 
 function showView(view) {
+  if (
+    ![
+      "home",
+      "room",
+      "flat",
+      "kitchen",
+      "expenses",
+      "wishlist",
+      "journal",
+    ].includes(view)
+  )
+    return;
   currentView = view;
   $$(".view").forEach((section) => {
     const active = section.id === `view-${view}`;
@@ -219,17 +262,20 @@ function showView(view) {
     section.classList.toggle("active", active);
   });
   $$("[data-view]").forEach((button) => {
-    const active = button.dataset.view === view;
+    const active =
+      button.dataset.view === view ||
+      (button.dataset.navGroup === "upgrades" && view === "journal");
     button.classList.toggle("active", active);
     if (active) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   });
   $("#breadcrumb").textContent =
-    `Your space / ${{ room: "My room", wishlist: "Wishlist", journal: "Price journal" }[view]}`;
+    `Roomies / ${{ home: "Home", room: "My room", flat: "My flat", kitchen: "Kitchen", expenses: "Shared costs", wishlist: "Upgrades · Wishlist", journal: "Upgrades · Price journal" }[view]}`;
   if (view === "journal") renderJournal();
 }
 
 function renderAll() {
+  ensureHousehold();
   renderMetrics();
   renderPlan();
   renderInspector();
@@ -237,6 +283,7 @@ function renderAll() {
   renderRoomIssues();
   renderWishlist();
   renderJournal();
+  renderHousehold();
 }
 function renderMetrics() {
   const room = state.room,
@@ -245,11 +292,15 @@ function renderMetrics() {
     `${number.format(summary.area_m2 ?? (room.width_cm * room.depth_cm) / 10000)} m²`;
   $("#metric-dimensions").textContent =
     `${number.format(room.width_cm / 100)} × ${number.format(room.depth_cm / 100)} m`;
-  $("#metric-owned").textContent = `${number.format(summary.occupied_m2 ?? 0)} m²`;
-  $("#metric-planned").textContent = `${number.format(summary.reserved_m2 ?? 0)} m²`;
+  $("#metric-owned").textContent =
+    `${number.format(summary.occupied_m2 ?? 0)} m²`;
+  $("#metric-planned").textContent =
+    `${number.format(summary.reserved_m2 ?? 0)} m²`;
   $("#metric-free").textContent = `${number.format(summary.free_m2 ?? 0)} m²`;
   $("#free-caption").textContent =
-    summary.valid === false ? "check conflicts below" : "before access clearances";
+    summary.valid === false
+      ? "check conflicts below"
+      : "before access clearances";
   $("#sample-note").hidden = !room.is_demo;
   if (room.is_demo) {
     const text = $("#sample-note>span:nth-child(2)");
@@ -265,7 +316,8 @@ function renderMetrics() {
       ),
     );
   }
-  $("#plan-subtitle").textContent = `${room.name} · positions measured in centimetres.`;
+  $("#plan-subtitle").textContent =
+    `${room.name} · positions measured in centimetres.`;
   $("#wish-count").textContent = String(state.products.length);
 }
 
@@ -275,7 +327,8 @@ function openingRectangle(opening) {
     depth = Number(opening.depth_cm || 0),
     offset = Number(opening.offset_cm);
   if (opening.wall === "north") return [offset, 0, width, depth];
-  if (opening.wall === "south") return [offset, Number(room.depth_cm) - depth, width, depth];
+  if (opening.wall === "south")
+    return [offset, Number(room.depth_cm) - depth, width, depth];
   if (opening.wall === "west") return [0, offset, depth, width];
   return [Number(room.width_cm) - depth, offset, depth, width];
 }
@@ -296,7 +349,9 @@ function itemRectangle(item) {
 
 function drawFurniture(group, item, w, d, thumbnail = false) {
   const planned = item.status === "planned";
-  const rawColor = /^#[0-9a-f]{6}$/i.test(item.color || "") ? item.color : "#caa077";
+  const rawColor = /^#[0-9a-f]{6}$/i.test(item.color || "")
+    ? item.color
+    : "#caa077";
   const stroke = planned ? "#87996d" : "#a58d71";
   const fill = planned ? "#ecf0df" : rawColor;
   group.append(
@@ -347,7 +402,10 @@ function drawFurniture(group, item, w, d, thumbnail = false) {
         }),
       );
     group.append(
-      svgNode("path", { d: `M 5 ${d * 0.28} H ${w - 5} M 5 ${d * 0.82} H ${w - 5}`, ...detail }),
+      svgNode("path", {
+        d: `M 5 ${d * 0.28} H ${w - 5} M 5 ${d * 0.82} H ${w - 5}`,
+        ...detail,
+      }),
     );
   } else if (item.category === "desk") {
     group.append(
@@ -368,15 +426,34 @@ function drawFurniture(group, item, w, d, thumbnail = false) {
       }),
     );
     group.append(
-      svgNode("circle", { cx: w * 0.84, cy: d * 0.23, r: Math.min(w, d) * 0.06, ...detail }),
+      svgNode("circle", {
+        cx: w * 0.84,
+        cy: d * 0.23,
+        r: Math.min(w, d) * 0.06,
+        ...detail,
+      }),
     );
   } else if (["wardrobe", "storage", "shelf"].includes(item.category)) {
-    group.append(svgNode("line", { x1: w / 2, y1: 3, x2: w / 2, y2: d - 3, ...detail }));
     group.append(
-      svgNode("line", { x1: w / 2 - 4, y1: d * 0.43, x2: w / 2 - 4, y2: d * 0.59, ...detail }),
+      svgNode("line", { x1: w / 2, y1: 3, x2: w / 2, y2: d - 3, ...detail }),
     );
     group.append(
-      svgNode("line", { x1: w / 2 + 4, y1: d * 0.43, x2: w / 2 + 4, y2: d * 0.59, ...detail }),
+      svgNode("line", {
+        x1: w / 2 - 4,
+        y1: d * 0.43,
+        x2: w / 2 - 4,
+        y2: d * 0.59,
+        ...detail,
+      }),
+    );
+    group.append(
+      svgNode("line", {
+        x1: w / 2 + 4,
+        y1: d * 0.43,
+        x2: w / 2 + 4,
+        y2: d * 0.59,
+        ...detail,
+      }),
     );
   } else if (item.category === "lamp") {
     group.append(
@@ -408,13 +485,21 @@ function drawFurniture(group, item, w, d, thumbnail = false) {
         ...detail,
       }),
     );
-    group.append(svgNode("path", { d: `M ${w * 0.15} ${d * 0.13} H ${w * 0.85}`, ...detail }));
+    group.append(
+      svgNode("path", {
+        d: `M ${w * 0.15} ${d * 0.13} H ${w * 0.85}`,
+        ...detail,
+      }),
+    );
   } else if (["rug", "curtain"].includes(item.category)) {
     for (let x = 5; x < w; x += 8)
-      group.append(svgNode("line", { x1: x, y1: 3, x2: x, y2: d - 3, ...detail }));
+      group.append(
+        svgNode("line", { x1: x, y1: 3, x2: x, y2: d - 3, ...detail }),
+      );
   }
   if (!thumbnail && w > 38 && d > 28) {
-    const label = item.name.length > 18 ? `${item.name.slice(0, 16)}…` : item.name;
+    const label =
+      item.name.length > 18 ? `${item.name.slice(0, 16)}…` : item.name;
     group.append(
       svgNode(
         "text",
@@ -456,7 +541,10 @@ function renderPlan(focusId = null) {
   const width = Number(room.width_cm),
     depth = Number(room.depth_cm),
     margin = 55;
-  svg.setAttribute("viewBox", `0 0 ${width + margin * 2} ${depth + margin * 2 + 15}`);
+  svg.setAttribute(
+    "viewBox",
+    `0 0 ${width + margin * 2} ${depth + margin * 2 + 15}`,
+  );
   svg.replaceChildren();
   const defs = svgNode("defs");
   const pattern = svgNode("pattern", {
@@ -478,7 +566,12 @@ function renderPlan(focusId = null) {
   svg.append(
     svgNode(
       "text",
-      { x: margin + width / 2, y: 25, "text-anchor": "middle", class: "room-dimension" },
+      {
+        x: margin + width / 2,
+        y: 25,
+        "text-anchor": "middle",
+        class: "room-dimension",
+      },
       `${number.format(width)} cm`,
     ),
   );
@@ -494,7 +587,14 @@ function renderPlan(focusId = null) {
   );
   [margin, margin + width].forEach((x) =>
     svg.append(
-      svgNode("line", { x1: x, y1: 29, x2: x, y2: 37, stroke: "#c6ceb8", "stroke-width": 0.7 }),
+      svgNode("line", {
+        x1: x,
+        y1: 29,
+        x2: x,
+        y2: 37,
+        stroke: "#c6ceb8",
+        "stroke-width": 0.7,
+      }),
     ),
   );
   svg.append(
@@ -522,7 +622,14 @@ function renderPlan(focusId = null) {
   );
   [margin, margin + depth].forEach((y) =>
     svg.append(
-      svgNode("line", { x1: 27, y1: y, x2: 35, y2: y, stroke: "#c6ceb8", "stroke-width": 0.7 }),
+      svgNode("line", {
+        x1: 27,
+        y1: y,
+        x2: 35,
+        y2: y,
+        stroke: "#c6ceb8",
+        "stroke-width": 0.7,
+      }),
     ),
   );
   const plan = svgNode("g", { transform: `translate(${margin} ${margin})` });
@@ -577,7 +684,11 @@ function renderPlan(focusId = null) {
       );
       continue;
     }
-    if (opening.kind === "door" && opening.swing === "in" && $("#show-clearance").checked) {
+    if (
+      opening.kind === "door" &&
+      opening.swing === "in" &&
+      $("#show-clearance").checked
+    ) {
       plan.append(
         svgNode("rect", {
           x,
@@ -624,17 +735,26 @@ function renderPlan(focusId = null) {
       );
       plan.append(
         svgNode("line", {
-          x1: coords[0] + (opening.wall === "east" ? -3 : opening.wall === "west" ? 3 : 0),
-          y1: coords[1] + (opening.wall === "north" ? 3 : opening.wall === "south" ? -3 : 0),
-          x2: coords[2] + (opening.wall === "east" ? -3 : opening.wall === "west" ? 3 : 0),
-          y2: coords[3] + (opening.wall === "north" ? 3 : opening.wall === "south" ? -3 : 0),
+          x1:
+            coords[0] +
+            (opening.wall === "east" ? -3 : opening.wall === "west" ? 3 : 0),
+          y1:
+            coords[1] +
+            (opening.wall === "north" ? 3 : opening.wall === "south" ? -3 : 0),
+          x2:
+            coords[2] +
+            (opening.wall === "east" ? -3 : opening.wall === "west" ? 3 : 0),
+          y2:
+            coords[3] +
+            (opening.wall === "north" ? 3 : opening.wall === "south" ? -3 : 0),
           stroke: "#c4d5bd",
           "stroke-width": 1,
         }),
       );
     } else {
       const vertical = ["east", "west"].includes(opening.wall);
-      const inward = opening.wall === "north" || opening.wall === "west" ? 1 : -1;
+      const inward =
+        opening.wall === "north" || opening.wall === "west" ? 1 : -1;
       const cx = coords[0],
         cy = coords[1];
       if (opening.swing !== "none") {
@@ -642,9 +762,22 @@ function renderPlan(focusId = null) {
         const ex = vertical ? cx + length * direction : cx;
         const ey = vertical ? cy : cy + length * direction;
         plan.append(
-          svgNode("line", { x1: cx, y1: cy, x2: ex, y2: ey, stroke: "#b6bdac", "stroke-width": 1 }),
+          svgNode("line", {
+            x1: cx,
+            y1: cy,
+            x2: ex,
+            y2: ey,
+            stroke: "#b6bdac",
+            "stroke-width": 1,
+          }),
         );
-        const sweep = vertical ? (direction > 0 ? 0 : 1) : direction > 0 ? 1 : 0;
+        const sweep = vertical
+          ? direction > 0
+            ? 0
+            : 1
+          : direction > 0
+            ? 1
+            : 0;
         plan.append(
           svgNode("path", {
             d: `M ${coords[2]} ${coords[3]} A ${length} ${length} 0 0 ${sweep} ${ex} ${ey}`,
@@ -757,13 +890,24 @@ function renderPlan(focusId = null) {
       "NORTH = TOP · NOT A CONSTRUCTION DRAWING",
     ),
   );
-  const north = svgNode("g", { transform: `translate(${width + margin + 23} ${margin + 7})` });
-  north.append(svgNode("path", { d: "M0 0 L-4 10 L0 7 L4 10 Z", class: "north-arrow" }));
-  north.append(svgNode("text", { x: 0, y: -6, "text-anchor": "middle", class: "room-text" }, "N"));
+  const north = svgNode("g", {
+    transform: `translate(${width + margin + 23} ${margin + 7})`,
+  });
+  north.append(
+    svgNode("path", { d: "M0 0 L-4 10 L0 7 L4 10 Z", class: "north-arrow" }),
+  );
+  north.append(
+    svgNode(
+      "text",
+      { x: 0, y: -6, "text-anchor": "middle", class: "room-text" },
+      "N",
+    ),
+  );
   svg.append(north);
   if (focusId)
     for (const group of $$("[data-item-id]", svg))
-      if (group.dataset.itemId === focusId) group.focus({ preventScroll: true });
+      if (group.dataset.itemId === focusId)
+        group.focus({ preventScroll: true });
 }
 
 function pointerInRoom(event) {
@@ -782,7 +926,9 @@ function beginDrag(event, item) {
   event.preventDefault();
   if (item.locked) {
     selectItem(item.id, false);
-    toast("This item is fixed. Uncheck “Keep this item fixed” before dragging it.");
+    toast(
+      "This item is fixed. Uncheck “Keep this item fixed” before dragging it.",
+    );
     return;
   }
   selectItem(item.id, false);
@@ -870,7 +1016,8 @@ function itemKeydown(event, item) {
     const factor = event.shiftKey ? 5 : 1;
     item.x_cm = Number(item.x_cm) + x * factor;
     item.y_cm = Number(item.y_cm) + y * factor;
-  } else if (event.key.toLowerCase() === "r") item.rotation = Number(item.rotation) === 90 ? 0 : 90;
+  } else if (event.key.toLowerCase() === "r")
+    item.rotation = Number(item.rotation) === 90 ? 0 : 90;
   else {
     renderInspector();
     return;
@@ -916,7 +1063,9 @@ function renderInspector() {
   );
   form.elements.parent_id.replaceChildren(
     node("option", { value: "" }, "Choose an item"),
-    ...parents.map((parent) => node("option", { value: parent.id }, parent.name)),
+    ...parents.map((parent) =>
+      node("option", { value: parent.id }, parent.name),
+    ),
   );
   form.elements.parent_id.value = item.parent_id || "";
   updatePlacementFields();
@@ -939,11 +1088,16 @@ function renderItemIssues() {
   root.replaceChildren();
   if (!item) return;
   if (savedRevision < mutationRevision) {
-    root.append(node("p", {}, "Your latest position has not been saved and checked yet."));
+    root.append(
+      node("p", {}, "Your latest position has not been saved and checked yet."),
+    );
     return;
   }
-  const issues = (state.summary?.issues || []).filter((issue) => issue.item_id === item.id);
-  if (issues.length) issues.forEach((issue) => root.append(node("p", {}, issue.message)));
+  const issues = (state.summary?.issues || []).filter(
+    (issue) => issue.item_id === item.id,
+  );
+  if (issues.length)
+    issues.forEach((issue) => root.append(node("p", {}, issue.message)));
   else
     root.append(
       node(
@@ -988,21 +1142,34 @@ function renderInventory() {
         item.status === "owned" ? "Already mine" : "For later",
       ),
     );
-    const conflicts = (state.summary?.issues || []).filter((issue) => issue.item_id === item.id);
+    const conflicts = (state.summary?.issues || []).filter(
+      (issue) => issue.item_id === item.id,
+    );
     if (conflicts.length)
       meta.append(
-        node("span", {}, `${conflicts.length} ${conflicts.length === 1 ? "check" : "checks"}`),
+        node(
+          "span",
+          {},
+          `${conflicts.length} ${conflicts.length === 1 ? "check" : "checks"}`,
+        ),
       );
     append(
       row,
-      node("span", { class: "item-symbol", "aria-hidden": "true" }, symbol(item.category)),
+      node(
+        "span",
+        { class: "item-symbol", "aria-hidden": "true" },
+        symbol(item.category),
+      ),
       main,
       meta,
       node("span", { "aria-hidden": "true" }, "↗"),
     );
     row.addEventListener("click", () => {
       selectItem(item.id);
-      $("#inspector-heading").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      $("#inspector-heading").scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
     });
     list.append(row);
   }
@@ -1016,7 +1183,13 @@ function renderRoomIssues() {
     $("#room-check-heading").textContent = "Checking your changes";
     $("#room-check-icon").textContent = "…";
     $("#room-check-icon").classList.add("warning");
-    list.append(node("p", { class: "muted" }, "Your latest room edits need to be saved before placement results are confirmed."));
+    list.append(
+      node(
+        "p",
+        { class: "muted" },
+        "Your latest room edits need to be saved before placement results are confirmed.",
+      ),
+    );
     return;
   }
   $("#room-check-heading").textContent = issues.length
@@ -1078,11 +1251,26 @@ function updateItemFromForm() {
     item = itemById(selectedId);
   if (!item) return;
   if (!form.checkValidity()) return;
-  for (const key of ["name", "category", "status", "placement", "color", "notes"])
+  for (const key of [
+    "name",
+    "category",
+    "status",
+    "placement",
+    "color",
+    "notes",
+  ])
     item[key] = formValue(form, key);
-  for (const key of ["width_cm", "depth_cm", "height_cm", "x_cm", "y_cm", "clearance_cm"])
+  for (const key of [
+    "width_cm",
+    "depth_cm",
+    "height_cm",
+    "x_cm",
+    "y_cm",
+    "clearance_cm",
+  ])
     item[key] = Number(formValue(form, key));
-  item.parent_id = item.placement === "surface" ? formValue(form, "parent_id") || null : null;
+  item.parent_id =
+    item.placement === "surface" ? formValue(form, "parent_id") || null : null;
   item.target_eur = nullableNumber(formValue(form, "target_price")) || 0;
   item.locked = form.elements.locked.checked;
   $("#selected-name").textContent = item.name;
@@ -1117,7 +1305,10 @@ async function suggestPositions() {
         ),
       );
     for (const placement of result.placements || []) {
-      const option = node("button", { type: "button", class: "suggestion-button" });
+      const option = node("button", {
+        type: "button",
+        class: "suggestion-button",
+      });
       option.append(
         document.createTextNode(
           `X ${number.format(placement.x_cm)} · Y ${number.format(placement.y_cm)} · ${placement.rotation}°`,
@@ -1153,7 +1344,15 @@ function openRoomSettings() {
   if (!state) return;
   const form = $("#room-settings-form"),
     room = state.room;
-  for (const key of ["name", "width_cm", "depth_cm", "height_cm", "budget_eur", "style", "notes"])
+  for (const key of [
+    "name",
+    "width_cm",
+    "depth_cm",
+    "height_cm",
+    "budget_eur",
+    "style",
+    "notes",
+  ])
     form.elements.namedItem(key).value = room[key];
   form.elements.wall_color.value = room.wall_color || "#a4b497";
   form.elements.floor_color.value = room.floor_color || "#f4f6ed";
@@ -1169,11 +1368,14 @@ function openingField(opening, key, label, type = "number", options = null) {
   let input;
   if (options) {
     input = node("select");
-    options.forEach(([value, text]) => input.append(node("option", { value }, text)));
+    options.forEach(([value, text]) =>
+      input.append(node("option", { value }, text)),
+    );
   } else input = node("input", { type, step: 0.5, min: 0, required: true });
   input.value = opening[key] ?? 0;
   input.addEventListener("change", () => {
-    opening[key] = type === "number" && !options ? Number(input.value) : input.value;
+    opening[key] =
+      type === "number" && !options ? Number(input.value) : input.value;
     if (key === "kind") {
       opening.swing = opening.kind === "door" ? "in" : "none";
       opening.depth_cm = opening.kind === "door" ? opening.width_cm : 0;
@@ -1211,7 +1413,9 @@ function renderOpeningsEditors() {
       openingField(
         opening,
         "depth_cm",
-        opening.kind === "obstacle" ? "Depth into room · cm" : "Keep-clear depth · cm",
+        opening.kind === "obstacle"
+          ? "Depth into room · cm"
+          : "Keep-clear depth · cm",
       ),
     );
     if (opening.kind === "door")
@@ -1224,14 +1428,22 @@ function renderOpeningsEditors() {
       );
     else opening.swing = "none";
     const actions = node("div", { class: "repeater-actions wide-field" });
-    const remove = node("button", { type: "button", class: "small-button" }, "Remove");
+    const remove = node(
+      "button",
+      { type: "button", class: "small-button" },
+      "Remove",
+    );
     remove.addEventListener("click", () => {
-      settingsOpenings = settingsOpenings.filter((candidate) => candidate.id !== opening.id);
+      settingsOpenings = settingsOpenings.filter(
+        (candidate) => candidate.id !== opening.id,
+      );
       renderOpeningsEditors();
     });
     actions.append(remove);
     row.append(actions);
-    $(opening.kind === "obstacle" ? "#obstacles-editor" : "#openings-editor").append(row);
+    $(
+      opening.kind === "obstacle" ? "#obstacles-editor" : "#openings-editor",
+    ).append(row);
   }
 }
 
@@ -1293,7 +1505,14 @@ function productIllustration(product, item) {
     fill = "#d8c4a8",
     pale = "#f7f5ec";
   svg.append(
-    svgNode("ellipse", { cx: 100, cy: 114, rx: 66, ry: 7, fill: "#d9ddce", opacity: 0.45 }),
+    svgNode("ellipse", {
+      cx: 100,
+      cy: 114,
+      rx: 66,
+      ry: 7,
+      fill: "#d9ddce",
+      opacity: 0.45,
+    }),
   );
   if (category === "desk") {
     svg.append(
@@ -1329,8 +1548,19 @@ function productIllustration(product, item) {
       }),
     );
   } else if (category === "lamp") {
-    svg.append(svgNode("ellipse", { cx: 102, cy: 111, rx: 30, ry: 7, fill: "#b8c3a2", stroke }));
-    svg.append(svgNode("path", { d: "M 102 111 V 53", stroke, "stroke-width": 4 }));
+    svg.append(
+      svgNode("ellipse", {
+        cx: 102,
+        cy: 111,
+        rx: 30,
+        ry: 7,
+        fill: "#b8c3a2",
+        stroke,
+      }),
+    );
+    svg.append(
+      svgNode("path", { d: "M 102 111 V 53", stroke, "stroke-width": 4 }),
+    );
     svg.append(
       svgNode("path", {
         d: "M 85 27 L 118 27 L 139 61 L 65 61 Z",
@@ -1375,7 +1605,13 @@ function productIllustration(product, item) {
         "stroke-width": 0.8,
       }),
     );
-    svg.append(svgNode("path", { d: "M 72 81 L134 55", stroke: "#9ba887", "stroke-width": 1.2 }));
+    svg.append(
+      svgNode("path", {
+        d: "M 72 81 L134 55",
+        stroke: "#9ba887",
+        "stroke-width": 1.2,
+      }),
+    );
   } else if (category === "rug") {
     svg.append(
       svgNode("path", {
@@ -1394,7 +1630,9 @@ function productIllustration(product, item) {
         }),
       );
   } else if (category === "curtain") {
-    svg.append(svgNode("path", { d: "M 45 20 H 157", stroke, "stroke-width": 3 }));
+    svg.append(
+      svgNode("path", { d: "M 45 20 H 157", stroke, "stroke-width": 3 }),
+    );
     svg.append(
       svgNode("path", {
         d: "M 49 23 H91 L80 109 H48 Z M 115 23 H155 V109 H123 Z",
@@ -1428,9 +1666,18 @@ function productIllustration(product, item) {
         fill: "none",
       }),
     );
-    svg.append(svgNode("path", { d: "M 106 72 V84 M120 71 V83", stroke, "stroke-width": 1.8 }));
+    svg.append(
+      svgNode("path", {
+        d: "M 106 72 V84 M120 71 V83",
+        stroke,
+        "stroke-width": 1.8,
+      }),
+    );
   }
-  holder.append(svg, node("span", { class: "illustration-note" }, "Category sketch"));
+  holder.append(
+    svg,
+    node("span", { class: "illustration-note" }, "Category sketch"),
+  );
   return holder;
 }
 
@@ -1440,7 +1687,8 @@ function evaluationLabel(product) {
   if (evaluation.fit === "fail") return ["Doesn’t fit this place", "blocked"];
   if (product.is_demo || product.latest_observation?.source === "demo")
     return ["Demo · no deal alert", "waiting"];
-  if (evaluation.fit === "pass") return ["Fits · still checking the details", "waiting"];
+  if (evaluation.fit === "pass")
+    return ["Fits · still checking the details", "waiting"];
   return ["A few details to confirm", "waiting"];
 }
 
@@ -1467,7 +1715,9 @@ function productMetadata(product) {
     "monitor",
     "is_demo",
   ];
-  return Object.fromEntries(keys.filter((key) => key in product).map((key) => [key, product[key]]));
+  return Object.fromEntries(
+    keys.filter((key) => key in product).map((key) => [key, product[key]]),
+  );
 }
 
 async function checkProduct(productId, button) {
@@ -1481,7 +1731,9 @@ async function checkProduct(productId, button) {
       body: "{}",
     });
     await reload();
-    toast("Price check recorded. Review delivery, stock and variant before buying.");
+    toast(
+      "Price check recorded. Review delivery, stock and variant before buying.",
+    );
   } catch (error) {
     await reload().catch(() => {});
     toast(error.message, true);
@@ -1494,9 +1746,13 @@ async function checkProduct(productId, button) {
 async function downloadData(path) {
   try {
     await flushRoom();
+    await flushFlat();
     window.location.href = path;
   } catch (error) {
-    toast(`Export stopped because your latest changes could not be saved. ${error.message}`, true);
+    toast(
+      `Export stopped because your latest changes could not be saved. ${error.message}`,
+      true,
+    );
   }
 }
 
@@ -1507,7 +1763,9 @@ function renderWishlist() {
   const products = state.products.filter(
     (product) =>
       wishlistFilter === "all" ||
-      (wishlistFilter === "ready" ? product.evaluation?.eligible : !product.evaluation?.eligible),
+      (wishlistFilter === "ready"
+        ? product.evaluation?.eligible
+        : !product.evaluation?.eligible),
   );
   $("#wishlist-empty").hidden = state.products.length > 0;
   if (!products.length && state.products.length)
@@ -1553,9 +1811,17 @@ function renderWishlist() {
     const reasonList = product.evaluation?.reasons || [
       "Record a price and confirm the exact variant.",
     ];
-    reasonList.slice(0, 3).forEach((reason) => reasons.append(node("p", {}, reason)));
+    reasonList
+      .slice(0, 3)
+      .forEach((reason) => reasons.append(node("p", {}, reason)));
     if (reasonList.length > 3)
-      reasons.append(node("p", {}, `+ ${reasonList.length - 3} more checks in the price journal`));
+      reasons.append(
+        node(
+          "p",
+          {},
+          `+ ${reasonList.length - 3} more checks in the price journal`,
+        ),
+      );
     body.append(reasons);
     const watchRow = node("div", { class: "product-watch-row" });
     const watch = node("label", { class: "watch-label" });
@@ -1567,7 +1833,10 @@ function renderWishlist() {
       try {
         const payload = productMetadata(product);
         payload.monitor = checkbox.checked;
-        await api("/api/products", { method: "POST", body: JSON.stringify(payload) });
+        await api("/api/products", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
         await reload();
         toast(
           checkbox.checked
@@ -1581,7 +1850,11 @@ function renderWishlist() {
         checkbox.disabled = false;
       }
     });
-    const check = node("button", { type: "button", class: "text-button" }, "↻ Check price");
+    const check = node(
+      "button",
+      { type: "button", class: "text-button" },
+      "↻ Check price",
+    );
     check.addEventListener("click", () => checkProduct(product.id, check));
     append(watchRow, watch, check);
     body.append(watchRow);
@@ -1593,16 +1866,23 @@ function renderWishlist() {
         ),
       );
     else source.append(document.createTextNode("No price observations yet"));
-    if (product.is_demo) source.append(node("span", { class: "demo-label" }, "DEMO"));
+    if (product.is_demo)
+      source.append(node("span", { class: "demo-label" }, "DEMO"));
     body.append(source);
     const footer = node("div", { class: "product-footer" });
     const record = node("button", { type: "button" }, "+ Record price");
     record.addEventListener("click", () => openObservation(product.id));
     const details = node("button", { type: "button" }, "Details");
-    details.addEventListener("click", () => openProduct(product.item_id, product.id));
+    details.addEventListener("click", () =>
+      openProduct(product.item_id, product.id),
+    );
     const href = safeUrl(product.url);
     const store = href
-      ? node("a", { href, target: "_blank", rel: "noopener noreferrer" }, "Store ↗")
+      ? node(
+          "a",
+          { href, target: "_blank", rel: "noopener noreferrer" },
+          "Store ↗",
+        )
       : null;
     append(footer, record, details, store);
     body.append(footer);
@@ -1641,7 +1921,9 @@ function openProduct(itemId = null, editId = null) {
   form.elements.item_id.value = itemId || "";
   const item = itemById(itemId);
   if (item) form.elements.target_price.value = item.target_eur || "";
-  $("#product-dialog-title").textContent = editId ? "The details of this find" : "Add a find";
+  $("#product-dialog-title").textContent = editId
+    ? "The details of this find"
+    : "Add a find";
   const product = productById(editId);
   if (product) {
     for (const key of [
@@ -1659,7 +1941,9 @@ function openProduct(itemId = null, editId = null) {
     form.elements.item_id.value = product.item_id;
     form.elements.target_price.value = product.target_eur;
     form.elements.notes.value = product.identity_notes || "";
-    form.elements.variant_confirmed.checked = Boolean(product.variant_confirmed);
+    form.elements.variant_confirmed.checked = Boolean(
+      product.variant_confirmed,
+    );
     form.elements.rotation_allow90.checked = product.rotation_allow90 !== false;
     form.elements.monitor.checked = Boolean(product.monitor);
   }
@@ -1696,7 +1980,10 @@ async function saveProduct(event) {
   try {
     await flushRoom();
     if (productEditId) payload.id = productEditId;
-    await api("/api/products", { method: "POST", body: JSON.stringify(payload) });
+    await api("/api/products", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
     $("#product-dialog").close();
     await reload();
     showView("wishlist");
@@ -1726,12 +2013,16 @@ function openObservation(productId = null) {
   const form = $("#observation-form");
   form.reset();
   form.elements.product_id.replaceChildren(
-    ...state.products.map((product) => node("option", { value: product.id }, product.name)),
+    ...state.products.map((product) =>
+      node("option", { value: product.id }, product.name),
+    ),
   );
-  form.elements.product_id.value = productId || selectedJournalId || state.products[0].id;
+  form.elements.product_id.value =
+    productId || selectedJournalId || state.products[0].id;
   form.elements.observed_at.value = localDateValue();
   form.elements.observed_at.max = localDateValue();
-  form.elements.source_url.value = productById(form.elements.product_id.value)?.url || "";
+  form.elements.source_url.value =
+    productById(form.elements.product_id.value)?.url || "";
   $("#observation-error").hidden = true;
   $("#observation-dialog").showModal();
 }
@@ -1789,11 +2080,15 @@ function deliveredObservation(observation) {
 function renderJournal() {
   if (!state) return;
   const select = $("#journal-product");
-  if (!productById(selectedJournalId)) selectedJournalId = state.products[0]?.id || null;
+  if (!productById(selectedJournalId))
+    selectedJournalId = state.products[0]?.id || null;
   select.replaceChildren(
-    ...state.products.map((product) => node("option", { value: product.id }, product.name)),
+    ...state.products.map((product) =>
+      node("option", { value: product.id }, product.name),
+    ),
   );
-  if (!state.products.length) select.append(node("option", { value: "" }, "No products yet"));
+  if (!state.products.length)
+    select.append(node("option", { value: "" }, "No products yet"));
   select.value = selectedJournalId || "";
   select.disabled = !state.products.length;
   const product = productById(selectedJournalId);
@@ -1840,7 +2135,9 @@ function renderPriceChart(product) {
     right = 598,
     top = 23,
     bottom = 202;
-  const dates = observations.map((observation) => new Date(observation.observed_at).getTime()),
+  const dates = observations.map((observation) =>
+      new Date(observation.observed_at).getTime(),
+    ),
     first = Math.min(...dates),
     last = Math.max(...dates);
   const x = (value) =>
@@ -1905,7 +2202,10 @@ function renderPriceChart(product) {
     );
   }
   const path = observations
-    .map((observation, index) => `${index ? "L" : "M"} ${x(dates[index])} ${y(values[index])}`)
+    .map(
+      (observation, index) =>
+        `${index ? "L" : "M"} ${x(dates[index])} ${y(values[index])}`,
+    )
     .join(" ");
   if (observations.length > 1) {
     svg.append(
@@ -1956,7 +2256,10 @@ function renderPriceChart(product) {
           "font-size": 9,
           "font-family": "Segoe UI,Arial,sans-serif",
         },
-        new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+        new Date(date).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+        }),
       ),
     ),
   );
@@ -1970,7 +2273,11 @@ function renderHistory(product) {
   if (!observations.length) {
     const row = node("tr");
     row.append(
-      node("td", { colspan: 7 }, "No observations yet. A recorded price always keeps its source."),
+      node(
+        "td",
+        { colspan: 7 },
+        "No observations yet. A recorded price always keeps its source.",
+      ),
     );
     root.append(row);
     return;
@@ -1996,7 +2303,10 @@ function renderHistory(product) {
       node("td", {}, friendlyDate(observation.observed_at)),
       node("td", {}, money(observation.price_eur)),
       node("td", {}, money(observation.shipping_eur)),
-      append(node("td"), node("strong", {}, money(deliveredObservation(observation)))),
+      append(
+        node("td"),
+        node("strong", {}, money(deliveredObservation(observation))),
+      ),
       node(
         "td",
         {},
@@ -2007,9 +2317,14 @@ function renderHistory(product) {
             : "Unknown",
       ),
       source,
-      node("td", {}, observation.variant_confirmed ? "Confirmed" : "Not confirmed"),
+      node(
+        "td",
+        {},
+        observation.variant_confirmed ? "Confirmed" : "Not confirmed",
+      ),
     );
-    if (observation.notes || observation.note) row.title = observation.notes || observation.note;
+    if (observation.notes || observation.note)
+      row.title = observation.notes || observation.note;
     root.append(row);
   }
 }
@@ -2038,12 +2353,20 @@ function renderTracker() {
         "Use Check price to request a public-page check, or record a price manually.",
     ),
   );
-  const monitored = state.products.filter((product) => product.monitor && !product.is_demo).length;
+  const monitored = state.products.filter(
+    (product) => product.monitor && !product.is_demo,
+  ).length;
   root.append(
-    node("p", {}, `${monitored} ${monitored === 1 ? "link is" : "links are"} being watched.`),
+    node(
+      "p",
+      {},
+      `${monitored} ${monitored === 1 ? "link is" : "links are"} being watched.`,
+    ),
   );
   if (tracker.next_check_at)
-    root.append(node("p", {}, `Next due: ${friendlyDate(tracker.next_check_at)}`));
+    root.append(
+      node("p", {}, `Next due: ${friendlyDate(tracker.next_check_at)}`),
+    );
   root.append(
     node(
       "p",
@@ -2053,17 +2376,27 @@ function renderTracker() {
   );
   const product = productById(selectedJournalId);
   if (product?.last_check_error || product?.error)
-    root.append(node("p", {}, `Last product check: ${product.last_check_error || product.error}`));
+    root.append(
+      node(
+        "p",
+        {},
+        `Last product check: ${product.last_check_error || product.error}`,
+      ),
+    );
   if (product?.evaluation?.reasons?.length) {
     root.append(node("strong", {}, "Checks for this find"));
-    product.evaluation.reasons.forEach((reason) => root.append(node("p", {}, `• ${reason}`)));
+    product.evaluation.reasons.forEach((reason) =>
+      root.append(node("p", {}, `• ${reason}`)),
+    );
   }
 }
 
 function renderNotifications() {
   const root = $("#notification-list");
   root.replaceChildren();
-  const unread = state.notifications.filter((notification) => !notification.read).length;
+  const unread = state.notifications.filter(
+    (notification) => !notification.read,
+  ).length;
   $("#notification-count").textContent = `${unread} new`;
   if (!state.notifications.length) {
     root.append(
@@ -2077,7 +2410,8 @@ function renderNotifications() {
   }
   for (const notification of [...state.notifications].reverse()) {
     const informational =
-      notification.type === "price_drop_info" || notification.type === "price_drop";
+      notification.type === "price_drop_info" ||
+      notification.type === "price_drop";
     const row = node("div", { class: "notification-row" }),
       content = node("div");
     content.append(
@@ -2093,20 +2427,30 @@ function renderNotifications() {
       row,
       node(
         "span",
-        { class: `check-icon ${informational ? "warning" : ""}`, "aria-hidden": "true" },
+        {
+          class: `check-icon ${informational ? "warning" : ""}`,
+          "aria-hidden": "true",
+        },
         informational ? "↓" : "✓",
       ),
       content,
     );
     if (!notification.read) {
-      const button = node("button", { type: "button", class: "small-button" }, "Mark read");
+      const button = node(
+        "button",
+        { type: "button", class: "small-button" },
+        "Mark read",
+      );
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
-          await api(`/api/notifications/${encodeURIComponent(notification.id)}/read`, {
-            method: "POST",
-            body: "{}",
-          });
+          await api(
+            `/api/notifications/${encodeURIComponent(notification.id)}/read`,
+            {
+              method: "POST",
+              body: "{}",
+            },
+          );
           await reload();
         } catch (error) {
           toast(error.message, true);
@@ -2125,7 +2469,9 @@ async function checkAll(button) {
     return;
   }
   if (!state.products.some((product) => product.monitor)) {
-    toast("Enable “Watch this link” for a product, or use its individual Check price button.");
+    toast(
+      "Enable “Watch this link” for a product, or use its individual Check price button.",
+    );
     return;
   }
   button.disabled = true;
@@ -2164,7 +2510,7 @@ function downloadPlan() {
     type: "image/svg+xml;charset=utf-8",
   });
   const url = URL.createObjectURL(blob);
-  const link = node("a", { href: url, download: "roommate-room-plan.svg" });
+  const link = node("a", { href: url, download: "roomies-room-plan.svg" });
   document.body.append(link);
   link.click();
   link.remove();
@@ -2179,13 +2525,25 @@ async function readImport(event) {
   if (!file) return;
   try {
     if (file.size > 2_000_000)
-      throw new Error("This file is larger than 2 MB. Use a RoomMate JSON export.");
+      throw new Error(
+        "This file is larger than 2 MB. Use a Roomies JSON export.",
+      );
     const data = JSON.parse(await file.text());
-    if (!data.room || !Array.isArray(data.room.items) || !Array.isArray(data.products))
-      throw new Error("This file needs a room, an items array and a products array.");
+    if (
+      !data.room ||
+      !Array.isArray(data.room.items) ||
+      !Array.isArray(data.products)
+    )
+      throw new Error(
+        "This file needs a room, an items array and a products array.",
+      );
     importCandidate = data;
+    const flatCopy =
+      data.schema_version === 2 && data.flat
+        ? ` Its flat contains ${data.flat.members?.length || 0} people, ${data.flat.inventory?.length || 0} belongings and ${data.flat.expenses?.length || 0} shared costs. The room, price journal and flat will be replaced.`
+        : " This is a room-only backup: the room and price journal will be replaced; your current flat, kitchen and shared costs stay unchanged.";
     $("#import-description").textContent =
-      `This file contains “${data.room.name || "a room"}”, ${data.room.items.length} room items and ${data.products.length} products. Your current workspace will be replaced.`;
+      `This file contains “${data.room.name || "a room"}”, ${data.room.items.length} room items and ${data.products.length} products.${flatCopy}`;
     $("#import-preview").hidden = false;
   } catch (error) {
     $("#import-error").textContent = error.message;
@@ -2199,12 +2557,18 @@ async function confirmImport() {
   button.disabled = true;
   try {
     await flushRoom();
-    await api("/api/import", { method: "POST", body: JSON.stringify(importCandidate) });
+    await flushFlat();
+    await api("/api/import", {
+      method: "POST",
+      body: JSON.stringify(importCandidate),
+    });
     selectedId = null;
     selectedJournalId = null;
     await reload();
     $("#data-dialog").close();
-    toast("Workspace imported. Check the room and linked finds before using them.");
+    toast(
+      "Workspace imported. Check the room and linked finds before using them.",
+    );
   } catch (error) {
     $("#import-error").textContent = error.message;
     $("#import-error").hidden = false;
@@ -2214,6 +2578,7 @@ async function confirmImport() {
 }
 
 function wireEvents() {
+  wireHouseholdEvents();
   $$("[data-view]").forEach((button) =>
     button.addEventListener("click", () => showView(button.dataset.view)),
   );
@@ -2241,7 +2606,9 @@ function wireEvents() {
   $("#delete-item").addEventListener("click", () => {
     const item = itemById(selectedId);
     if (!item) return;
-    const children = state.room.items.filter((candidate) => candidate.parent_id === item.id);
+    const children = state.room.items.filter(
+      (candidate) => candidate.parent_id === item.id,
+    );
     if (children.length) {
       toast(
         `Move or remove ${children.map((child) => child.name).join(", ")} first; ${item.name} is their parent.`,
@@ -2255,7 +2622,9 @@ function wireEvents() {
       )
     )
       return;
-    state.room.items = state.room.items.filter((candidate) => candidate.id !== item.id);
+    state.room.items = state.room.items.filter(
+      (candidate) => candidate.id !== item.id,
+    );
     selectedId = state.room.items[0]?.id || null;
     renderAll();
     markDirty();
@@ -2296,9 +2665,15 @@ function wireEvents() {
   $("#product-form").addEventListener("submit", saveProduct);
   $("#delete-product").addEventListener("click", async () => {
     const product = productById(productEditId);
-    if (!product || !window.confirm(`Remove “${product.name}” and its saved observations?`)) return;
+    if (
+      !product ||
+      !window.confirm(`Remove “${product.name}” and its saved observations?`)
+    )
+      return;
     try {
-      await api(`/api/products/${encodeURIComponent(product.id)}`, { method: "DELETE" });
+      await api(`/api/products/${encodeURIComponent(product.id)}`, {
+        method: "DELETE",
+      });
       $("#product-dialog").close();
       await reload();
       toast("Find removed from your wishlist.");
@@ -2313,10 +2688,16 @@ function wireEvents() {
       $("#product-form").elements.target_price.value = item.target_eur || "";
   });
   $("#observation-form").addEventListener("submit", saveObservation);
-  $("#observation-form").elements.product_id.addEventListener("change", (event) => {
-    $("#observation-form").elements.source_url.value = productById(event.target.value)?.url || "";
-  });
-  $("#journal-add-observation").addEventListener("click", () => openObservation(selectedJournalId));
+  $("#observation-form").elements.product_id.addEventListener(
+    "change",
+    (event) => {
+      $("#observation-form").elements.source_url.value =
+        productById(event.target.value)?.url || "";
+    },
+  );
+  $("#journal-add-observation").addEventListener("click", () =>
+    openObservation(selectedJournalId),
+  );
   $("#journal-product").addEventListener("change", (event) => {
     selectedJournalId = event.target.value;
     renderJournal();
@@ -2330,9 +2711,15 @@ function wireEvents() {
       renderWishlist();
     }),
   );
-  $("#check-all").addEventListener("click", (event) => checkAll(event.currentTarget));
-  $("#journal-check-all").addEventListener("click", (event) => checkAll(event.currentTarget));
-  $("#export-prices").addEventListener("click", () => downloadData("/api/export?format=csv"));
+  $("#check-all").addEventListener("click", (event) =>
+    checkAll(event.currentTarget),
+  );
+  $("#journal-check-all").addEventListener("click", (event) =>
+    checkAll(event.currentTarget),
+  );
+  $("#export-prices").addEventListener("click", () =>
+    downloadData("/api/export?format=csv"),
+  );
   $$("a[href^='/api/export']").forEach((link) =>
     link.addEventListener("click", (event) => {
       event.preventDefault();
@@ -2349,7 +2736,7 @@ function wireEvents() {
   $("#import-file").addEventListener("change", readImport);
   $("#confirm-import").addEventListener("click", confirmImport);
   window.addEventListener("beforeunload", (event) => {
-    if (savedRevision < mutationRevision) {
+    if (savedRevision < mutationRevision || flatSavingPromise) {
       event.preventDefault();
       event.returnValue = "";
     }
@@ -2373,11 +2760,32 @@ async function start() {
 
 function setWorkspaceAvailable(available) {
   const controls = [
-    "add-item", "add-item-bottom", "add-product", "add-product-empty",
-    "journal-add-observation", "check-all", "journal-check-all", "download-plan",
-    "data-menu-button", "data-menu-top", "room-settings-top", "sample-settings",
+    "add-item",
+    "add-item-bottom",
+    "add-product",
+    "add-product-empty",
+    "journal-add-observation",
+    "check-all",
+    "journal-check-all",
+    "download-plan",
+    "data-menu-button",
+    "data-menu-top",
+    "room-settings-top",
+    "sample-settings",
+    "room-settings-local",
+    "flat-settings-button",
+    "flat-setup-button",
+    "expense-people-button",
+    "add-flat-item",
+    "add-kitchen-item",
+    "add-fridge-item",
+    "add-expense",
+    "export-expenses",
   ];
-  controls.forEach(identity => { const control = document.getElementById(identity); if (control) control.disabled = !available; });
+  controls.forEach((identity) => {
+    const control = document.getElementById(identity);
+    if (control) control.disabled = !available;
+  });
 }
 
 async function pollWorkspace() {
@@ -2385,14 +2793,24 @@ async function pollWorkspace() {
     document.hidden ||
     dragging ||
     savingPromise ||
+    flatSavingPromise ||
     mutationRevision !== savedRevision ||
     $$("dialog").some((dialog) => dialog.open)
   )
     return;
   try {
     const revision = mutationRevision,
+      flatVersion = flatRevision,
       refreshed = await api("/api/state");
-    if (revision !== mutationRevision || dragging || savingPromise) return;
+    if (
+      revision !== mutationRevision ||
+      flatVersion !== flatRevision ||
+      dragging ||
+      savingPromise ||
+      flatSavingPromise ||
+      $$("dialog").some((dialog) => dialog.open)
+    )
+      return;
     const previousUnread = new Set(
       state.notifications
         .filter((notification) => !notification.read)
@@ -2401,10 +2819,14 @@ async function pollWorkspace() {
     state.products = refreshed.products || [];
     state.notifications = refreshed.notifications || [];
     state.tracker = refreshed.tracker;
+    state.flat = refreshed.flat || state.flat;
+    state.flat_summary = refreshed.flat_summary || state.flat_summary;
     renderWishlist();
     renderJournal();
+    renderHousehold();
     const newAlerts = state.notifications.filter(
-      (notification) => !notification.read && !previousUnread.has(notification.id),
+      (notification) =>
+        !notification.read && !previousUnread.has(notification.id),
     );
     if (newAlerts.length)
       toast(

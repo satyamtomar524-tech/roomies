@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from roommate.server import RoomMateServer
 from roommate.storage import Storage
+from tests.test_household import household_data
 
 
 class ServerTests(unittest.TestCase):
@@ -20,6 +21,7 @@ class ServerTests(unittest.TestCase):
         (self.web / "index.html").write_text("<h1>RoomMate</h1>", encoding="utf-8")
         (self.web / "guide.html").write_text("<h1>A useful guide</h1>", encoding="utf-8")
         (self.web / "guide.css").write_text("body{}", encoding="utf-8")
+        (self.web / "flat.js").write_text("console.log('flat');", encoding="utf-8")
         self.server = RoomMateServer(("127.0.0.1", 0), self.storage, self.web)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -46,9 +48,11 @@ class ServerTests(unittest.TestCase):
         status, headers, content = self.request("GET", "/api/state")
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(content)["summary"]["area_m2"], 10.5)
+        self.assertEqual(json.loads(content)["flat"]["expenses"], [])
         self.assertEqual(headers["X-Frame-Options"], "DENY")
         self.assertEqual(self.request("GET", "/guide")[0], 200)
         self.assertEqual(self.request("GET", "/guide.css")[0], 200)
+        self.assertEqual(self.request("GET", "/flat.js")[0], 200)
         self.assertEqual(self.request("GET", "/../roommate/storage.py")[0], 404)
         self.assertEqual(self.request("GET", "/%2e%2e/roommate/storage.py")[0], 404)
         self.assertEqual(self.request("GET", "/data/room.sqlite3")[0], 404)
@@ -102,6 +106,38 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(json.loads(content)["observation"]["price_eur"], 60)
         self.assertEqual(self.request("DELETE", f"/api/products/{identity}")[0], 200)
         self.assertEqual(self.request("DELETE", f"/api/products/{identity}")[0], 404)
+
+    def test_flat_write_is_separate_and_summary_uses_exact_cent_shares(self):
+        before_room = self.storage.state()["room"]
+        status, _, content = self.request("PUT", "/api/flat", household_data())
+        self.assertEqual(status, 200)
+        result = json.loads(content)
+        self.assertEqual(result["flat"]["inventory"][0]["spot"], "Upper shelf")
+        self.assertEqual(result["flat_summary"]["expenses"]["total_cents"], 1001)
+        self.assertEqual(self.storage.state()["room"], before_room)
+        status, _, content = self.request("GET", "/api/state")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(content)["flat"], result["flat"])
+
+    def test_invalid_or_cross_origin_flat_write_cannot_replace_saved_data(self):
+        flat = self.storage.save_flat(household_data())
+        before = self.storage.export()
+        invalid = {**flat, "members": []}
+        self.assertEqual(self.request("PUT", "/api/flat", invalid)[0], 400)
+        self.assertEqual(self.request("PUT", "/api/flat", flat, {"Origin": "https://malicious.example"})[0], 403)
+        self.assertEqual(self.storage.export(), before)
+
+    def test_expense_csv_and_version_two_json_are_downloadable(self):
+        self.storage.save_flat(household_data())
+        status, headers, content = self.request("GET", "/api/export?format=expenses")
+        self.assertEqual(status, 200)
+        self.assertIn("roomies-expense-shares.csv", headers["Content-Disposition"])
+        self.assertIn("share_cents", content.decode("utf-8-sig"))
+        status, headers, content = self.request("GET", "/api/export?format=json")
+        result = json.loads(content)
+        self.assertEqual(result["schema_version"], 2)
+        self.assertEqual(result["flat"]["expenses"][0]["amount_cents"], 1001)
+        self.assertIn("roomies-backup.json", headers["Content-Disposition"])
 
     def test_encoded_product_ids_round_trip_without_path_confusion(self):
         product = self.storage.save_product({"id": "my desk/one", "name": "Desk with imported ID", "item_id": "desk"})

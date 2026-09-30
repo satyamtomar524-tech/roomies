@@ -1,67 +1,73 @@
-# Read this first
+# Start with one task
 
-RoomMate has one main job: connect a measured place in a student room to a planned upgrade and its price evidence.
+Roomies has six areas. Pick the page for the task you want to do; you do not need to set up everything at once.
 
-## Use the app
+## Get started
 
-1. Run `python -m roommate` from the project directory. On Windows you can run `start.ps1`.
-2. Open the local address printed in the terminal.
-3. Look at the sample room. It is 300 × 350 cm, not a measurement of anyone's actual room.
-4. Open Room settings, enter the actual measurements, and review doors, windows, and obstacles. Confirm them only after measuring; sample rooms cannot create buying alerts. Choose wall and floor colours for a rough plan preview.
-5. Add what you own with full external dimensions. Select an item to edit or rotate it.
-6. Add a planned item where you want something later. Its dimensions define the reservation.
-7. Link a wishlist product to that reservation. Enter the exact product variant and dimensions. For automatic price-drop notices, also enter and confirm the retailer's exact SKU.
-8. Record a checked price with shipping, stock, evidence URL, and time. Unknown shipping stays blank.
-9. Check the fit and price explanation. A target alert is a decision prompt; it does not purchase anything.
-10. Export a backup from the workspace data menu before making a large change.
+Run `python -m roommate` from the project directory, or `start.ps1` on Windows. Open the printed local address. The code keeps the original Python module name for compatibility.
 
-Scheduled price checks run only while the server is running and the product's monitoring is enabled. An unsupported page can still be recorded manually. The project does not claim coverage of every store.
+- **Home:** a short overview and shortcuts.
+- **My room:** the measured room plan. Start with the sample, then enter your actual walls, openings and furniture.
+- **My flat:** belongings and where to find them. Add a name, room, exact spot, quantity and owner.
+- **Kitchen:** kitchen equipment plus fridge, freezer and pantry supplies. Update stock status as things are used.
+- **Shared costs:** people, bills and balances.
+- **Upgrades:** wishlist products and price history.
 
-## Understand it without reading everything
+The flat starts empty. Add your flatmates in flat settings before assigning belongings or splitting a bill.
 
-Start with one behavior. For example, move the desk 10 cm to the right and follow the change:
+## Find something you own
 
-| Step | File | What happens |
-|---|---|---|
-| Click or drag | `web/app.js` | Updates the selected item's coordinates and sends a JSON request |
-| API request | `roommate/server.py` | Checks the request and calls the room-storage operation |
-| Measurement checks | `roommate/geometry.py` | Validates dimensions and checks the new placement |
-| Persistence | `roommate/storage.py` | Saves the room in SQLite |
-| Response | `web/app.js` | Shows the saved room and any conflicts |
+Add a kettle in My flat. Set location to Kitchen, spot to Worktop beside the sink, and owner to Shared. Later, search “kettle” or filter by Kitchen.
 
-An API is the interface between the browser and Python. JSON is the structured text they exchange. SQLite is a database stored in one local file. None of these require a paid cloud account.
+Small objects do not need dimensions. My flat is an inventory; My room is a measured arrangement. They remain separate so adding a spoon cannot create a floor-plan conflict.
 
-## The main concepts
+## Keep the kitchen useful
 
-**Room:** dimensions, wall openings, budget, style, notes, and items.
+Equipment such as pans and kettles belongs in the flat inventory. Food belongs in the kitchen stock list. Choose Fridge, Freezer or Pantry and record the amount as ordinary text, such as “1 carton.”
 
-**Owned item:** something you already have. It appears with a solid outline.
+Set stock to Stocked, Low or Out. Low and Out entries become the shopping checklist. Optional best-before dates help organize what to check next. The app cannot determine freshness or safety from an entered date.
 
-**Planned item:** a future place. It appears with a dashed outline and reserves its footprint.
+## Split a bill
 
-**Product:** a particular retailer item or variant, linked to a planned place.
+1. Add the people in your flat.
+2. Enter the bill title, date and total amount.
+3. Select who paid.
+4. Select the people sharing that bill. A person can pay without taking a share.
+5. Save and review the balances and suggested payments.
 
-**Observation:** a dated record of a price, shipping, stock, source, and variant check. Keeping observations separately allows price history to remain inspectable.
+A positive balance means that person is owed money. A negative balance means they owe money. Values stay in exact cents. Remainder cents go to the first participants in saved order.
 
-**Notification:** either a confirmed delivered-price target alert or a separately labeled item-price change. RoomMate prevents the same unchanged offer from generating repeated alerts. An imported backup restores observations without replaying old notifications.
+Suggested payments describe the saved expense ledger. Roomies does not move money or record completed bank transfers. Edit or remove an incorrect expense; do not treat a suggestion as a payment receipt. Member removal is blocked if belongings, food or bills still reference that person.
 
-## What “fits” means
+## Arrange the room
 
-The entered product dimensions fit the linked reservation in one of the modeled 0° or 90° orientations, and the relevant modeled room placement is not blocked. This is a geometric check using rectangles. It does not model assembly access, comfort, detailed shapes, structural loads, or building compliance.
+Select a piece, drag it or edit its coordinates, and wait for the saved status. Use More details for less frequent controls. Arrow keys move by 5 cm; R rotates.
 
-For a lamp, choose Surface and a supporting desk. Coordinates are local to that surface. A rug uses Overlay, so furniture can overlap it. Wall items do not count as occupied floor furniture.
+Owned items have solid outlines and planned places have dashed outlines. Surface objects use local coordinates on one supporting floor item. Rugs can use Overlay. Wall markers do not occupy floor area.
 
-## Learn from a small change later
+Confirm the actual room measurements before using buying alerts. The sample room is an illustration. A geometric fit checks rectangles and defined clearances, not comfort, load capacity, assembly access or building compliance.
 
-When you want to learn the code, begin by changing one room label or adding a new sample item. Then run the existing tests. Next, change a placement rule and add a test that demonstrates the intended behavior. Follow with one SQL report over observations.
+## Consider an upgrade
 
-Keep the first learning task small. You do not need to understand the network importer, server, drawing code, and database schema in one sitting.
+Link an exact product to a planned place. Enter dimensions and the delivered-price target. Record a quote with stock, shipping, time, source and variant confirmation.
 
-## Run the checks
+Unknown shipping stays blank. A live SKU match can support an informational item-price notice; it cannot invent a delivered total. A buying-target alert requires all the fit, evidence and delivery conditions in `DATA_AND_RULES.md`.
 
-```sh
-python -m unittest discover -s tests -v
-node --check web/app.js
-```
+## Follow one action through the code
 
-The tests exercise meaningful behaviors and failure cases. Passing tests do not establish real room safety or universal retailer compatibility. See `VERIFICATION.md` for the recorded checks and limits.
+| Action | Browser | Python rule | Saved data |
+|---|---|---|---|
+| Move a desk | `web/app.js` | `geometry.py` | Room in `storage.py` |
+| Store a kettle's location | `web/flat.js` | `household.py` | Flat in `storage.py` |
+| Split groceries | `web/flat.js` | `expenses.py` | Expense inside flat |
+| Record a product quote | `web/app.js` | `pricing.py` | Separate observation |
+
+`server.py` receives the JSON requests. An API is this browser-to-Python interface. JSON is the structured text they exchange. SQLite is the database stored in one local file.
+
+Start learning with one action. For example, trace how a €20.00 expense becomes 2,000 cents, is divided and appears in the balance table. Then change one small behavior and verify it with the existing checks.
+
+## Back up the workspace
+
+Use the data menu to export a full backup. Current backups include the flat and room. Older room-only backups preserve the existing flat when imported. Runtime databases and actual backups belong outside the public repository.
+
+See `VERIFICATION.md` for the checks and `PORTFOLIO.md` for a description you can explain in an interview.

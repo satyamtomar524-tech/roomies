@@ -1,27 +1,27 @@
-# Putting RoomMate in a portfolio
+# Roomies in a portfolio
 
-Use the description after reviewing the parts you will discuss. The implementation was developed with coding assistance; do not present assistance as independent work or claim proficiency you have not yet practiced.
+Use the description after reviewing the parts you will discuss. The implementation was developed with coding assistance. Be clear about that assistance and describe the decisions you can explain.
 
-## Factual project description
+## Factual description
 
-**RoomMate — student room planner and upgrade tracker**
+**Roomies — student flat companion**
 
 Python · SQLite · JavaScript · SVG · HTTP APIs
 
-A local application that connects a measured room layout with future furniture reservations and a product price journal. It checks rectangular fit and placement conflicts, preserves dated price evidence, and separates delivered-price target alerts from item-price changes. Automated tests cover geometry, storage, API behavior and price rules; browser checks exercise the complete local workflow.
+A local application that combines measured room planning, belongings with storage locations, kitchen stock lists, shared expense splitting and a product price journal. It validates saved inputs, calculates shared balances in integer cents, preserves dated price evidence and separates item-price changes from delivered-price target alerts.
 
-If a CV entry uses “developed” or “implemented,” be ready to explain the implementation and your use of coding assistance. State the repository's current verified test count only if useful; no user or savings metrics have been collected.
+Automated tests cover the implemented rules and failure cases. Browser checks exercise room editing, household records, kitchen updates, expense balances and backup flows. No actual users, savings or productivity improvement have been measured.
 
-## A short interview walkthrough
+## A short interview demonstration
 
-1. Show the sample room and move the bed outside its boundary. Explain why the arrangement is saved with a visible error rather than silently corrected.
-2. Select the future desk. Explain that a reservation includes width, depth and height; a lamp has local coordinates on that supporting surface.
-3. Add a hypothetical product in a disposable test workspace. Explain why a low price with unknown shipping cannot pass the delivered-price target.
-4. Show the observation table and SQL query in `ARCHITECTURE.md`. Explain why observations are separate from product metadata and how old evidence stays inspectable.
-5. Run one geometry test and one price-rule test. Explain the expected behavior before showing the result.
+1. Add a kettle with its owner and exact storage spot, then find it through search.
+2. Mark milk as Low and show how it appears on the shopping checklist.
+3. Split a hypothetical €20.00 bill three ways. Explain the one-cent remainder and show the balances reconcile.
+4. Move a bed outside the sample room and explain the visible geometry error.
+5. Show why a low product price with unknown shipping cannot pass a delivered-price target.
 
-Use clearly labeled test data during a demonstration. The project does not establish that a real retailer's product is available or that a user saved money.
+Use a disposable workspace and label hypothetical records. Explain the difference between a member label and a real account: this version has local bookkeeping, not synchronized roommate logins.
 
-## The next learning step
+## What to learn next
 
-Trace one edit from `web/app.js` through `server.py`, `geometry.py` and `storage.py`. Then make one small change yourself and verify it with the existing checks. Keep a brief note of what you changed, the decision you made and the result you observed. That gives you concrete material to discuss without overstating your experience.
+Trace one bill from the browser form through `server.py`, `household.py`, `expenses.py` and `storage.py`. Make one small change yourself, run the relevant test and record what you observed. That gives you a concrete contribution to discuss.

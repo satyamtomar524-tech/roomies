@@ -1,4 +1,4 @@
-"""SQLite storage for one local room, its wishlist and price history."""
+"""SQLite storage for a local flat, room, wishlist and price history."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ import sqlite3
 import uuid
 
 from .geometry import ValidationError, analyse_room, validate_room
+from .household import default_flat, summarize_flat, validate_flat
+from .expenses import expense_shares
 from .pricing import evaluate_product, product_signature, validate_observation, validate_product
 
 
@@ -57,6 +59,7 @@ class Storage:
         with self._connect() as connection:
             connection.executescript("""
                 CREATE TABLE IF NOT EXISTS room (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS flat (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS products (
                     id TEXT PRIMARY KEY, data TEXT NOT NULL,
                     last_checked_at TEXT, error TEXT
@@ -78,6 +81,8 @@ class Storage:
                 connection.execute("ALTER TABLE notifications ADD COLUMN type TEXT NOT NULL DEFAULT 'target_ready'")
             if connection.execute("SELECT 1 FROM room WHERE id=1").fetchone() is None:
                 connection.execute("INSERT INTO room VALUES (1, ?)", (json.dumps(demo_room()),))
+            if connection.execute("SELECT 1 FROM flat WHERE id=1").fetchone() is None:
+                connection.execute("INSERT INTO flat VALUES (1, ?)", (json.dumps(default_flat()),))
 
     @contextmanager
     def _connect(self):
@@ -96,6 +101,10 @@ class Storage:
     @staticmethod
     def _room(connection) -> dict:
         return validate_room(json.loads(connection.execute("SELECT data FROM room WHERE id=1").fetchone()["data"]))
+
+    @staticmethod
+    def _flat(connection) -> dict:
+        return validate_flat(json.loads(connection.execute("SELECT data FROM flat WHERE id=1").fetchone()["data"]))
 
     @staticmethod
     def _observations(connection, product_id: str) -> list[dict]:
@@ -131,12 +140,14 @@ class Storage:
     def state(self) -> dict:
         with self._connect() as connection:
             room = self._room(connection)
+            flat = self._flat(connection)
             products = self._products(connection, room)
             notifications = [dict(row) for row in connection.execute("SELECT id,product_id,message,created_at,read,type FROM (SELECT rowid AS sequence,id,product_id,message,created_at,read,type FROM notifications ORDER BY created_at DESC,rowid DESC LIMIT 200) ORDER BY created_at ASC,sequence ASC")]
             for notification in notifications:
                 notification["read"] = bool(notification["read"])
         return {
             "room": room, "products": products, "notifications": notifications,
+            "flat": flat, "flat_summary": summarize_flat(flat),
             "summary": analyse_room(room),
             "tracker": {
                 "mode": "manual", "background_running": False,
@@ -150,6 +161,12 @@ class Storage:
         with self._connect() as connection:
             connection.execute("UPDATE room SET data=? WHERE id=1", (json.dumps(room),))
         return room
+
+    def save_flat(self, data: dict) -> dict:
+        flat = validate_flat(data)
+        with self._connect() as connection:
+            connection.execute("UPDATE flat SET data=? WHERE id=1", (json.dumps(flat),))
+        return flat
 
     def save_product(self, data: dict) -> dict:
         with self._connect() as connection:
@@ -245,7 +262,7 @@ class Storage:
             plain = {key: value for key, value in product.items() if key not in dynamic}
             plain["observations"] = [{key: value for key, value in observation.items() if key not in ("id", "product_id")} for observation in reversed(product["observations"])]
             products.append(plain)
-        return {"schema_version": 1, "room": state["room"], "products": products}
+        return {"schema_version": 2, "room": state["room"], "products": products, "flat": state["flat"]}
 
     def export_csv(self) -> str:
         output = io.StringIO(newline="")
@@ -267,10 +284,17 @@ class Storage:
         return output.getvalue()
 
     def import_data(self, payload: dict) -> dict:
-        if not isinstance(payload, dict) or set(payload) - {"schema_version", "room", "products"}:
-            raise ValidationError("Import requires only schema_version, room and products.")
-        if isinstance(payload.get("schema_version", 1), bool) or payload.get("schema_version", 1) != 1:
+        if not isinstance(payload, dict):
+            raise ValidationError("The backup must be an object.")
+        version = payload.get("schema_version", 1)
+        if isinstance(version, bool) or not isinstance(version, int) or version not in (1, 2):
             raise ValidationError("This export version is not supported.")
+        allowed_fields = {"schema_version", "room", "products"} | ({"flat"} if version == 2 else set())
+        if set(payload) - allowed_fields:
+            raise ValidationError("The backup contains unknown fields for its version.")
+        if version == 2 and "flat" not in payload:
+            raise ValidationError("A version 2 backup must include the flat.")
+        flat = validate_flat(payload["flat"]) if version == 2 else None
         room = validate_room(payload.get("room"))
         entries = payload.get("products", [])
         if not isinstance(entries, list) or len(entries) > 100:
@@ -302,6 +326,8 @@ class Storage:
         with self._connect() as connection:
             connection.execute("DELETE FROM products")
             connection.execute("UPDATE room SET data=? WHERE id=1", (json.dumps(room),))
+            if flat is not None:
+                connection.execute("UPDATE flat SET data=? WHERE id=1", (json.dumps(flat),))
             for product, observations in prepared:
                 connection.execute("INSERT INTO products(id,data) VALUES(?,?)", (product["id"], json.dumps(product)))
                 for observation in observations:
@@ -310,3 +336,22 @@ class Storage:
 
     def reset(self) -> dict:
         return self.import_data({"room": demo_room(), "products": []})
+
+    def export_expenses_csv(self) -> str:
+        """One row per participant's share; expense totals repeat on its rows."""
+        flat = self.state()["flat"]
+        names = {member["id"]: member["name"] for member in flat["members"]}
+        output = io.StringIO(newline="")
+        fields = ["expense_id", "title", "date", "category", "amount_cents", "paid_by", "payer_name", "participant_id", "participant_name", "share_cents", "notes"]
+        writer = csv.DictWriter(output, fieldnames=fields)
+        writer.writeheader()
+        for expense in flat["expenses"]:
+            for participant, share in expense_shares(expense).items():
+                row = {key: expense[key] for key in ("title", "date", "category", "amount_cents", "paid_by", "notes")}
+                row.update(expense_id=expense["id"], payer_name=names[expense["paid_by"]], participant_id=participant,
+                           participant_name=names[participant], share_cents=share)
+                for key, value in row.items():
+                    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+                        row[key] = "'" + value
+                writer.writerow(row)
+        return output.getvalue()

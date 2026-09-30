@@ -1,11 +1,11 @@
 {
-  "name": "roommate-browser-checks",
-  "version": "1.0.0",
+  "name": "roomies-browser-checks",
+  "version": "2.0.0",
   "private": true,
-  "description": "Optional browser checks for the local RoomMate application.",
+  "description": "Optional browser checks for the local Roomies application.",
   "scripts": {
     "test:browser": "node tests/browser-smoke.cjs",
-    "check": "node --check web/app.js"
+    "check": "node --check web/app.js && node --check web/flat.js"
   },
   "devDependencies": {
     "playwright": "1.62.1"

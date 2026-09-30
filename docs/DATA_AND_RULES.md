@@ -81,6 +81,28 @@ Automatic variant confirmation requires the user to confirm the saved variant an
 
 The fetcher uses HTTPS, public-address checks, pinned connections, bounded responses, redirect validation, and crawling-permission checks. It sends no cookies or account credentials. It cannot bypass a blocked page, authenticate, or execute JavaScript-only offers. Requests have socket and body-read time limits; the complete DNS, crawling-permission and redirect sequence has no single overall deadline.
 
+## Flat records and ownership
+
+The flat base is separate from room geometry. Inventory entries have a name, category, location, exact spot, positive integer quantity and optional owner. A NULL owner means Shared. Owner IDs must refer to current flat members. Members are bookkeeping labels, not authenticated accounts.
+
+Kitchen stock entries belong to Fridge, Freezer or Pantry. Quantity is ordinary descriptive text. Stock is Stocked, Low or Out. Low and Out entries form the shopping checklist. Best-before dates are optional calendar dates used for planning; they are not freshness or food-safety conclusions.
+
+Removing a referenced member is rejected. Existing records must first be reassigned or removed deliberately. The empty starter includes no invented objects, groceries or expense receipts.
+
+## Shared expense arithmetic
+
+Amounts are stored as positive integer cents in EUR. Equal shares use integer division. Remaining cents are assigned to the first participants in saved order. For example, 2,000 cents shared by three people yields 667, 667 and 666 cents.
+
+Balance = cents paid − allocated share. Positive means owed money; negative means owing money. Balances must sum to zero. Suggested payments match debtors to creditors deterministically and reconcile the recorded balances; the method is not claimed to find the fewest possible transfers.
+
+A payer may pay for other participants without taking a share. Expense edits change the current ledger; entries are not immutable accounting receipts. The app does not make payments, connect to banks, record completed settlements, or evaluate affordability.
+
+## Backups
+
+Schema 2 exports contain the room, products, observations and flat. Import validation completes before replacement, so rejected data cannot erase the existing workspace. Schema 1 room-only imports leave the current flat unchanged. Resetting the sample room preserves the flat. Imports do not replay historical price notifications.
+
+Expense CSV has one row per participant share. The expense's total repeats on each row: do not sum that total column across participant rows. Sum `share_cents` for allocated amounts, or count each expense ID once for expense totals.
+
 ## What is not claimed
 
 No actual savings, product availability, market price coverage, behavioral outcome, professional room survey, architectural compliance, or trained model is established by this software. Tests establish specific implemented properties and failure handling. Read `VERIFICATION.md` for the evidence from this build.

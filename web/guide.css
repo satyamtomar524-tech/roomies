@@ -3,8 +3,8 @@
   --ink: #26453a;
   --muted: #687267;
   --line: #d9ded2;
-  --paper: #f8f7f1;
-  --accent: #925834;
+  --paper: #f7f9fc;
+  --accent: #4f62b4;
 }
 * {
   box-sizing: border-box;
@@ -144,6 +144,20 @@ footer {
   padding: 25px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.project-details {
+  margin-top: 28px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.project-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 12px;
 }
 @media (max-width: 500px) {
   main {

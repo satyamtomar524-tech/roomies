@@ -1,5 +1,25 @@
 # Build journal
 
+## 30 September 2026 — Roomies
+
+The flat base grew from the user's request to list shared belongings, show where things are kept, organize kitchen and fridge supplies, and split shared expenses. The interface now starts with a simpler home screen and one page per task.
+
+### Decisions
+
+- Keep flat records separate from the measured room. A small belonging does not need a floor footprint.
+- Add owner and exact storage spot so the inventory answers where something is.
+- Keep kitchen equipment in inventory and food stock in a separate list. Low and missing stock becomes a shopping checklist.
+- Store shared amounts in integer cents and keep payer and participant IDs explicit.
+- Keep the original Python module for compatibility while naming the app and repository Roomies.
+- Preserve flat data when an old room-only backup is imported or the sample room is reset.
+- Use local member labels. Synchronized accounts and invitations are not implemented.
+
+### Next useful improvements
+
+1. Add recurring bill templates for rent and utilities.
+2. Let a shopping item become a shared expense with one reviewed action.
+3. Add optional authenticated syncing if the project moves beyond one local workspace.
+
 ## 30 September 2026 — First complete local version
 
 The original idea was a whole-house concept planner. It became more useful when narrowed to one student's room: owned furniture, future reservations, and buying decisions tied to those reservations.

@@ -1,4 +1,6 @@
 import copy
+import csv
+import io
 from datetime import datetime, timedelta, timezone
 import tempfile
 from pathlib import Path
@@ -7,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from roommate.storage import Storage
+from tests.test_household import household_data
 
 
 def product_data(**extra):
@@ -30,6 +33,109 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(state["products"], [])
         self.assertEqual(state["notifications"], [])
         self.assertFalse(state["tracker"]["background_running"])
+        self.assertEqual(state["flat"]["inventory"], [])
+        self.assertEqual(state["flat"]["fridge"], [])
+        self.assertEqual(state["flat"]["expenses"], [])
+
+    def test_flat_migration_keeps_existing_room_and_price_history(self):
+        product = self.storage.save_product(product_data())
+        before_room = self.storage.state()["room"]
+        with self.storage._connect() as connection:
+            connection.execute("DROP TABLE flat")
+        reopened = Storage(self.path)
+        state = reopened.state()
+        self.assertEqual(state["room"], before_room)
+        self.assertEqual(state["products"][0]["id"], product["id"])
+        self.assertEqual(state["products"][0]["latest_observation"]["price_eur"], 70)
+        self.assertEqual(state["flat"]["members"], [{"id": "me", "name": "Me"}])
+        self.assertEqual(state["flat"]["expenses"], [])
+
+    def test_flat_survives_reopen_and_is_separate_from_room(self):
+        original_room = self.storage.state()["room"]
+        saved = self.storage.save_flat(household_data())
+        reopened = Storage(self.path)
+        self.assertEqual(reopened.state()["flat"], saved)
+        self.assertEqual(reopened.state()["room"], original_room)
+        self.assertEqual(reopened.state()["flat_summary"]["expenses"]["total_cents"], 1001)
+
+    def test_legacy_import_and_room_reset_preserve_flat(self):
+        saved_flat = self.storage.save_flat(household_data())
+        legacy = self.storage.export()
+        legacy["schema_version"] = 1
+        legacy.pop("flat")
+        legacy["room"]["name"] = "Restored older room"
+        state = self.storage.import_data(legacy)
+        self.assertEqual(state["room"]["name"], "Restored older room")
+        self.assertEqual(state["flat"], saved_flat)
+        self.assertEqual(self.storage.reset()["flat"], saved_flat)
+
+    def test_version_two_round_trip_keeps_flat_and_exact_cents(self):
+        self.storage.save_product(product_data())
+        self.storage.save_flat(household_data())
+        before = self.storage.export()
+        self.assertEqual(before["schema_version"], 2)
+        self.storage.save_flat({"members": [{"id": "me", "name": "Me"}]})
+        self.storage.import_data(before)
+        self.assertEqual(self.storage.export(), before)
+        self.assertIsInstance(self.storage.state()["flat"]["expenses"][0]["amount_cents"], int)
+
+    def test_invalid_flat_or_schema_in_backup_preserves_entire_database(self):
+        self.storage.save_product(product_data())
+        self.storage.save_flat(household_data())
+        before = self.storage.export()
+        invalid = []
+        missing_flat = copy.deepcopy(before)
+        missing_flat.pop("flat")
+        invalid.append(missing_flat)
+        bad_owner = copy.deepcopy(before)
+        bad_owner["flat"]["inventory"][0]["owner_id"] = "missing"
+        invalid.append(bad_owner)
+        fractional_cents = copy.deepcopy(before)
+        fractional_cents["flat"]["expenses"][0]["amount_cents"] = 1001.0
+        invalid.append(fractional_cents)
+        for version in (True, 1.0, 3, "2"):
+            bad_version = copy.deepcopy(before)
+            bad_version["schema_version"] = version
+            invalid.append(bad_version)
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                with self.assertRaises(ValueError):
+                    self.storage.import_data(payload)
+                self.assertEqual(self.storage.export(), before)
+
+    def test_transaction_failure_rolls_back_flat_room_and_products(self):
+        self.storage.save_product(product_data())
+        self.storage.save_flat(household_data())
+        before = self.storage.export()
+        replacement = copy.deepcopy(before)
+        replacement["room"]["name"] = "Replacement room"
+        replacement["flat"]["name"] = "Replacement flat"
+        with patch.object(self.storage, "_insert_observation", side_effect=RuntimeError("Fixture write failure")):
+            with self.assertRaises(RuntimeError):
+                self.storage.import_data(replacement)
+        self.assertEqual(self.storage.export(), before)
+
+    def test_invalid_flat_write_preserves_saved_flat(self):
+        before = self.storage.save_flat(household_data())
+        invalid = copy.deepcopy(before)
+        invalid["members"] = []
+        with self.assertRaises(ValueError):
+            self.storage.save_flat(invalid)
+        self.assertEqual(self.storage.state()["flat"], before)
+
+    def test_expense_csv_cent_shares_and_formula_text_are_safe(self):
+        flat = household_data()
+        flat["members"][0]["name"] = "=Me"
+        flat["expenses"][0]["title"] = "+Groceries"
+        flat["expenses"][0]["notes"] = "  @a formula"
+        self.storage.save_flat(flat)
+        rows = list(csv.DictReader(io.StringIO(self.storage.export_expenses_csv())))
+        self.assertEqual([row["participant_id"] for row in rows], ["me", "amy"])
+        self.assertEqual([int(row["share_cents"]) for row in rows], [501, 500])
+        self.assertEqual([int(row["amount_cents"]) for row in rows], [1001, 1001])
+        self.assertEqual(rows[0]["payer_name"], "'=Me")
+        self.assertEqual(rows[0]["title"], "'+Groceries")
+        self.assertEqual(rows[0]["notes"], "'@a formula")
 
     def test_notification_type_is_migrated_for_existing_local_databases(self):
         with self.storage._connect() as connection:

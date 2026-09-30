@@ -1,105 +1,86 @@
-# RoomMate
+# Roomies
 
-**A small room can work better when every thing has a place.**
+**Your room, your flat, and the things you share.**
 
-I wanted a room planner that remembers what I already own, keeps space for the things I want later, and helps me decide whether a product actually fits my plan and budget. RoomMate puts that room map and shopping journal together.
+I wanted one place to plan my room, find the things I own, keep track of kitchen supplies, and split flat expenses. Roomies brings these everyday tasks together, with a simple home screen and a separate page for each job.
 
-The starting room is an illustrative **3 × 3.5 m** student room. It is not a measured copy of my room. Furniture dimensions and any example prices are labeled sample data.
-
-![RoomMate's sample room and measured plan](docs/screenshots/room-desktop.png)
+![Roomies home screen](docs/screenshots/home-desktop.png)
 
 ## Start here
 
-Requires Python 3.10 or newer. The application uses Python's standard library and does not require an API key or a paid service.
+Requires Python 3.10 or newer. The application uses Python's standard library. It needs no API key, paid service or database server.
 
 ```sh
-git clone https://github.com/satyamtomar524-tech/roommate.git
-cd roommate
-```
-
-Or download and extract the source ZIP, then open a terminal in its folder.
-
-```sh
+git clone https://github.com/satyamtomar524-tech/roomies.git
+cd roomies
 python -m roommate
 ```
 
-Open the local address printed in the terminal. On Windows, `py -m roommate` also works if the Python launcher is installed. `start.ps1` finds either an installed Python or the bundled Codex runtime.
+The Python module remains `roommate` so existing working copies and databases keep working. The installed package also provides a `roomies` command. On Windows, run `py -m roommate` or:
 
 ```powershell
 .\start.ps1
 ```
 
-Run from this repository directory. Leave the terminal open while using RoomMate. Ctrl+C stops it. Check `python -m roommate --help` for server options.
+Open the local address printed in the terminal. Leave the terminal open while using Roomies; Ctrl+C stops it. For planning and manual records without scheduled price checks, use `python -m roommate --no-tracker`.
 
-For room planning and manual price records without scheduled network requests, use `python -m roommate --no-tracker`.
+## One page for each job
 
-## What I can do with it
+| Page | What I use it for |
+|---|---|
+| Home | See the next useful action and open the right part of the app |
+| My room | Arrange measured furniture, reserve future spaces, preview colours and check conflicts |
+| My flat | List belongings, their owner, room and exact storage spot; search for an item |
+| Kitchen | Find kitchen equipment and check fridge, freezer and pantry supplies |
+| Shared costs | Record who paid, select who shares the bill and see balances |
+| Upgrades | Keep a wishlist and dated price observations linked to reserved room spaces |
 
-- Enter room and furniture measurements in centimeters.
-- Preview room colours and give each item its own plan colour.
-- Arrange owned furniture and mark space for planned purchases.
-- Check room boundaries, furniture overlaps, reserved spaces, and modeled door clearance.
-- Keep a lamp on a desk as a supported item, or a rug as an overlay instead of treating every object as floor furniture.
-- Compare suggested positions using explained placement rules.
-- Connect a wishlist product to its reserved space.
-- Record a product's dimensions, selected variant, availability, item price, and shipping.
-- Keep dated price observations in SQLite and view the price journal.
-- Check supported public product pages for an unambiguous EUR offer.
-- Receive an in-app alert when a verified product fits its reserved space and reaches the delivered-price target.
-- See a lower item price separately when delivery still needs confirmation.
-- Export room and shopping data, import a saved project, or export a price CSV.
+The room starts as a clearly labeled **3 × 3.5 m sample**. The flat starts empty with a placeholder member named Me. No possessions, groceries, purchases or debts are invented.
 
-## The decision RoomMate supports
+## The useful details
 
-```text
-Measured room → owned things → reserved spaces → suitable products → price observations
-```
+A belonging can be saved as “Kettle → Kitchen → Worktop beside the sink,” with an owner or Shared. These records do not need furniture dimensions. A measured bed on the room plan and a belonging in the flat list are separate records.
 
-A price below the target is only part of the decision. Product dimensions, the reserved place, selected variant, stock, shipping, and observation freshness also matter. Missing information stays visible; RoomMate does not fill it in.
+The kitchen list records what is stocked, running low or missing. Low and missing items form a shopping checklist. Optional best-before dates help decide what to check next; they are the user's records, not food-safety assessments.
 
-## Read the project in order
+Expenses use integer cents. A €20.00 bill split three ways becomes €6.67, €6.67 and €6.66 in the saved participant order. Balances and suggested payments reconcile every cent. Suggestions do not send money or track bank transfers.
 
-1. [Project guide](docs/PROJECT_GUIDE.md): what each part does and how to use it.
-2. [Architecture](docs/ARCHITECTURE.md): where the behavior lives and how data moves.
-3. [Data and rules](docs/DATA_AND_RULES.md): measurements, fit checks, price handling, and limitations.
-4. [Verification](docs/VERIFICATION.md): tests run and remaining limitations.
-5. [Build journal](docs/BUILD_JOURNAL.md): decisions and the next useful improvements.
+Room planning keeps the existing boundary, overlap, surface-parent and clearance checks. Advanced settings are available when needed. A lamp can belong to a desk surface; a rug can overlap furniture.
 
-An abbreviated guide is available inside the app.
+## Price tracking
 
-## Check the project
+Live checks read public [Product](https://schema.org/Product) and [Offer](https://schema.org/Offer) JSON-LD on compatible pages. They require an unambiguous current EUR offer and permitted crawling. Unsupported pages fail visibly and can be recorded manually.
+
+Automatic variant confidence requires a confirmed saved variant, matching retailer SKU and matching product link. The adapter leaves shipping unknown. An item-price drop is labeled separately from a confirmed delivered-price target alert.
+
+Checks run only while the local server is open. No real retailer has been demonstrated as compatible in this build. The app does not claim market-wide search, actual savings, automatic checkout or cloud notifications.
+
+## Understand the project
+
+Start with [Project guide](docs/PROJECT_GUIDE.md), then follow one action through [Architecture](docs/ARCHITECTURE.md). [Data and rules](docs/DATA_AND_RULES.md) explains fit, dates and money. [Verification](docs/VERIFICATION.md) records the checks. [Portfolio notes](docs/PORTFOLIO.md) gives a factual CV and interview description.
+
+An abbreviated guide is also available inside the app.
 
 ```sh
 python -m unittest discover -s tests -v
 node --check web/app.js
+node --check web/flat.js
 ```
 
-Browser checks are described in the verification document. GitHub Actions includes the Python suite, JavaScript syntax and a Chromium workflow. See the [actual workflow runs](https://github.com/satyamtomar524-tech/roommate/actions) for their current state.
+Optional browser checks and the [GitHub workflow runs](https://github.com/satyamtomar524-tech/roomies/actions) cover the full workflow.
 
-## Price tracking scope
+## Data and scope
 
-Live checks use public [Product](https://schema.org/Product) and [Offer](https://schema.org/Offer) JSON-LD data when the page is readable, crawling is allowed, and one current EUR offer can be identified. JavaScript-only pages, blocked requests, ambiguous variants, and unsupported currencies produce a visible failure rather than a guessed price. You can record a checked offer manually.
+Roomies is a local, single-user workspace. Member names are bookkeeping labels, not accounts or invitations. Roommates do not have live access from their own phones. Runtime databases are excluded from Git. Backups can contain room measurements, belongings and expense records; keep actual flat backups private.
 
-For live price-drop notices, confirm the saved variant and enter its retailer SKU. The fetched SKU and saved product link must match. The live adapter leaves shipping unknown, so these notices are not delivered-price recommendations. A checked manual observation can include delivery and confirm the variant for that quote.
+Current backups include the room, products, history and flat. Older room-only backups leave the flat unchanged. Importing a current backup replaces those saved records after confirmation. Imports do not replay old price alerts.
 
-Checks run locally while the server is running. There is no cloud monitoring, checkout automation, email delivery, or guarantee of coverage across retailers. A retailer's displayed discount is not taken as proof of savings. The journal records observed prices with their sources and dates.
+The floor plan uses rectangular footprints and modeled clearance zones, not a detailed survey or photorealistic 3D view. Suggestions are heuristic options. Colours are schematic previews. The budget is a recorded preference, not an affordability assessment.
 
-## Measurements and limitations
-
-RoomMate is for planning where things might go. It uses rectangular footprints and defined clearance zones, not a detailed 3D survey. A measured fit is only as accurate as the dimensions entered. Door clearance is conservative; personal comfort, access, wiring, radiator clearance, load capacity, fire escape, and building rules need separate attention. Suggested positions are heuristic options, not a globally optimal or certified layout.
-
-## Local data
-
-Room and shopping records stay in a local SQLite database. Runtime databases are excluded from Git. Exported backups may contain room measurements and product links: keep them private when they describe your actual room. Live checks send a request to the product site's public page; they do not use your browser account or cookies.
-
-## Portfolio use
-
-The project can demonstrate Python, SQL, HTTP APIs, geometric validation, price-history handling, automated testing, and interface design. Describe the parts you can explain and have checked. See [Portfolio notes](docs/PORTFOLIO.md) for a factual project description and a short interview walkthrough. Do not claim real users, measured savings, market-wide coverage, or autonomous architectural design.
-
-I used coding assistance to implement this project. The room-planning idea and requirements came from me. The code and guide are kept together so I can inspect each decision and learn the implementation as I develop it further.
+I used coding assistance to implement this project. The idea and requirements came from me. The code, tests and guide stay together so I can inspect the choices and learn the implementation.
 
 ## References
 
-The project idea combines room planning and a price journal. [EricAndrechek/Room-Planner](https://github.com/EricAndrechek/Room-Planner) and [sonoyumi/price-tracker](https://github.com/sonoyumi/price-tracker) were reviewed as feature references. This project is an original implementation; no source code from those repositories was copied.
+[EricAndrechek/Room-Planner](https://github.com/EricAndrechek/Room-Planner) and [sonoyumi/price-tracker](https://github.com/sonoyumi/price-tracker) were reviewed as feature references for the original room-and-price workflow. No source code from those repositories was copied.
 
 MIT license · Satyam Tomar

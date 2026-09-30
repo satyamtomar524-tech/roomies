@@ -5,6 +5,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const net = require('node:net');
 const { chromium } = require('playwright');
+const flatWorkflow = require('./flat-workflow.cjs');
 
 const root = path.resolve(__dirname, '..');
 const pause = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -59,6 +60,11 @@ async function main() {
     assert.equal(current.summary.area_m2, 10.5);
     assert(current.room.is_demo);
     assert.equal(current.products.length, 0);
+    assert.equal(current.flat.inventory.length, 0);
+    assert.equal(current.flat.fridge.length, 0);
+    assert.equal(current.flat.expenses.length, 0);
+    assert(await page.locator('#view-home').isVisible());
+    await page.locator('.navigation .nav-link[data-view="room"]').click();
 
     await page.locator('[data-item-id="bed"]').click();
     await page.locator('[data-item-id="bed"]').focus();
@@ -67,6 +73,7 @@ async function main() {
     await pause(350);
     await saved();
     assert.equal((await state()).room.items.find(item => item.id === 'bed').x_cm, 5);
+    await page.locator('#item-form > details > summary').click();
     await field('#item-form', 'x_cm').fill('-25');
     await pause(550);
     await saved();
@@ -105,7 +112,7 @@ async function main() {
     assert.equal((await state()).summary.valid, true);
     const planDownload = page.waitForEvent('download');
     await page.locator('#download-plan').click();
-    assert.equal((await planDownload).suggestedFilename(), 'roommate-room-plan.svg');
+    assert.equal((await planDownload).suggestedFilename(), 'roomies-room-plan.svg');
 
     // Confirmation here applies only to this test fixture, never the user's sample.
     await page.locator('#room-settings-top').click();
@@ -118,7 +125,7 @@ async function main() {
     assert.equal((await state()).room.is_demo, false);
     assert.equal((await state()).room.floor_color, '#fff0dd');
 
-    await page.locator('[data-view="wishlist"]').click();
+    await page.locator('.navigation .nav-link[data-view="wishlist"]').click();
     await page.locator('#add-product').click();
     for (const [name, value] of Object.entries({ name: 'Browser test desk', url: 'https://example.com/desk', target_price: '80', width_cm: '100', depth_cm: '50', height_cm: '73', color: 'Oak', variant: '100 × 50 cm, oak' })) {
       await field('#product-form', name).fill(value);
@@ -148,6 +155,9 @@ async function main() {
     }
     await quote(90, null, 3);
     assert.equal((await state()).notifications.length, 0);
+
+    await flatWorkflow(page, state, results);
+    await page.locator('.navigation .nav-link[data-view="wishlist"]').click();
     await quote(70, 5, 2);
     current = await state();
     assert.equal(current.products[0].evaluation.eligible, true);
@@ -204,20 +214,28 @@ async function main() {
 
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 844 });
-      for (const view of ['room', 'wishlist', 'journal']) {
-        await page.locator(`[data-view="${view}"]`).click();
+      for (const view of ['home', 'room', 'flat', 'kitchen', 'expenses', 'wishlist', 'journal']) {
+        if (view === 'journal') await page.locator('#view-wishlist [data-view="journal"]').click();
+        else await page.locator(`.navigation .nav-link[data-view="${view}"]`).click();
         const actual = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
         assert(actual.scroll <= actual.client, `${view} overflows at ${width}px: ${JSON.stringify(actual)}`);
       }
+      await page.locator('.navigation .nav-link[data-view="expenses"]').click();
+      await page.locator('#add-expense').click();
+      const saveExpense = page.locator('#expense-form button[type="submit"]');
+      await saveExpense.scrollIntoViewIfNeeded();
+      const saveBox = await saveExpense.boundingBox();
+      assert(saveBox && saveBox.y >= 0 && saveBox.y + saveBox.height <= 844, `Expense save button is reachable at ${width}px`);
+      await page.keyboard.press('Escape');
       await page.locator('#data-menu-top').click();
       assert(await page.locator('#data-dialog').isVisible());
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
       await page.locator('#data-dialog .close-dialog').click();
     }
     await page.goto(`${base}/guide`);
-    assert.match(await page.locator('body').innerText(), /RoomMate/);
+    assert.match(await page.locator('body').innerText(), /Roomies/);
     assert.deepEqual(errors, []);
-    console.log('PASS: drag/keyboard/rotation, room colours, geometry warnings, suggestions, product edits/SKU/watch controls, variant fit, two alert types, price history, read state, SVG/CSV/JSON exports, import, guide, and 320/390px layouts.');
+    console.log('PASS: room geometry and editing, product quotes and alerts, flat members and belongings, kitchen checklist, exact shared balances, full backup, guide, and all 320/390px layouts.');
     console.log(`Disposable test evidence: ${path.relative(root, results)}`);
   } finally {
     if (browser) await browser.close();
