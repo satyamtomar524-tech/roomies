@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#24463b" />
+    <title>RoomMate · Make room for what matters</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to workspace</a>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Workspace navigation">
+        <a class="brand" href="/" aria-label="RoomMate home"
+          ><span class="brand-mark" aria-hidden="true">r<span>m</span></span
+          ><span
+            >roommate<span class="brand-note">a little room. a lot of possibility.</span></span
+          ></a
+        >
+        <div class="workspace-label">MY SPACE</div>
+        <nav class="navigation" aria-label="Main">
+          <button class="nav-link active" data-view="room" aria-current="page">
+            <span class="nav-icon" aria-hidden="true">▦</span>My room<span class="nav-chevron"
+              >↗</span
+            >
+          </button>
+          <button class="nav-link" data-view="wishlist">
+            <span class="nav-icon" aria-hidden="true">♡</span>Wishlist<span
+              class="nav-count"
+              id="wish-count"
+              >0</span
+            >
+          </button>
+          <button class="nav-link" data-view="journal">
+            <span class="nav-icon" aria-hidden="true">⌁</span>Price journal
+          </button>
+          <a class="nav-link" href="/guide" target="_blank" rel="noopener"
+            ><span class="nav-icon" aria-hidden="true">↳</span>How this works<span
+              class="nav-chevron"
+              >↗</span
+            ></a
+          >
+        </nav>
+        <div class="sidebar-note">
+          <span class="tiny-eyebrow">ONE UPGRADE AT A TIME</span>
+          <p>A place for what you own.<br />A plan for what comes next.</p>
+          <div class="note-drawing" aria-hidden="true">
+            <span class="draw-window"></span><span class="draw-table"></span
+            ><span class="draw-lamp"></span><span class="draw-plant"></span>
+          </div>
+        </div>
+        <div class="sidebar-bottom">
+          <span class="status-dot" id="connection-dot"></span
+          ><span id="save-status" role="status">Connecting to your workspace</span
+          ><button
+            class="icon-button"
+            id="data-menu-button"
+            title="Import or export your workspace"
+            aria-label="Import or export your workspace"
+          >
+            ⇄
+          </button>
+        </div>
+      </aside>
+      <div class="main-shell">
+        <header class="topbar">
+          <span class="breadcrumb" id="breadcrumb">Your space / My room</span>
+          <div class="topbar-actions">
+            <span class="local-pill"><span class="status-dot"></span>Local workspace</span
+            ><button
+              class="icon-button"
+              id="data-menu-top"
+              aria-label="Import or export workspace"
+              title="Import or export workspace"
+            >
+              ⇄</button
+            ><button class="quiet-button" id="room-settings-top">
+              Room settings <span aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </header>
+        <main id="main" tabindex="-1">
+          <div id="load-error" class="notice error-notice" hidden role="alert"></div>
+          <section class="view active" id="view-room" aria-labelledby="room-heading">
+            <div class="page-heading">
+              <div>
+                <p class="eyebrow">A ROOM THAT FEELS LIKE YOU</p>
+                <h1 id="room-heading">Make room for<br /><em>what matters.</em></h1>
+                <p class="heading-copy">
+                  Arrange what you have. Leave a little space for what’s next.
+                </p>
+              </div>
+              <div class="heading-right">
+                <span class="round-badge" aria-hidden="true"
+                  >small space<br /><b>big plans</b><span>↗</span></span
+                >
+              </div>
+            </div>
+            <div class="sample-note" id="sample-note">
+              <span aria-hidden="true">ⓘ</span
+              ><span
+                >This is a <strong>sample 3 × 3.5 m room</strong>. Add your measurements before
+                using its placements or fit results.</span
+              ><button id="sample-settings">Set up my room →</button>
+            </div>
+            <div class="metrics" aria-label="Room measurements">
+              <div class="metric">
+                <span>Room area</span><strong id="metric-area">—</strong
+                ><small id="metric-dimensions">—</small>
+              </div>
+              <div class="metric">
+                <span>Owned furniture</span><strong id="metric-owned">—</strong
+                ><small>floor footprint</small>
+              </div>
+              <div class="metric">
+                <span>Future places</span><strong id="metric-planned">—</strong
+                ><small>reserved floor footprint</small>
+              </div>
+              <div class="metric">
+                <span>Space left</span><strong id="metric-free">—</strong
+                ><small id="free-caption">before access clearances</small>
+              </div>
+            </div>
+            <div class="room-grid">
+              <section class="panel planner-panel" aria-labelledby="plan-heading">
+                <div class="panel-heading">
+                  <div>
+                    <h2 id="plan-heading">Your room, from above</h2>
+                    <p id="plan-subtitle">Every position is measured in centimetres.</p>
+                  </div>
+                  <button
+                    class="small-button"
+                    id="download-plan"
+                    title="Download room plan as an SVG image"
+                  >
+                    ↓ <span>Save plan</span>
+                  </button>
+                </div>
+                <div class="plan-toolbar">
+                  <div class="legend">
+                    <span><i class="legend-owned"></i>Already mine</span
+                    ><span><i class="legend-planned"></i>For later</span
+                    ><span><i class="legend-clearance"></i>Keep clear</span>
+                  </div>
+                  <label class="toggle-label"
+                    ><input type="checkbox" id="show-clearance" checked />Access spaces</label
+                  >
+                </div>
+                <div class="plan-container" id="plan-container">
+                  <svg
+                    id="room-plan"
+                    viewBox="0 0 700 670"
+                    role="group"
+                    aria-label="Measured floor plan. Tab to a furniture item; use arrow keys to move it and R to rotate it."
+                  ></svg>
+                </div>
+                <div class="plan-footer">
+                  <span
+                    ><span class="keyboard-key">↔</span> Drag to move · arrow keys move 5 cm · R
+                    rotates</span
+                  ><span id="plan-scale">Measurements in cm</span>
+                </div>
+              </section>
+              <aside class="panel inspector-panel" aria-labelledby="inspector-heading">
+                <div class="panel-heading">
+                  <div>
+                    <p class="eyebrow small">THE DETAILS</p>
+                    <h2 id="inspector-heading">Pick a piece</h2>
+                  </div>
+                  <button
+                    class="icon-button"
+                    id="add-item"
+                    aria-label="Add furniture or a future reservation"
+                    title="Add an item"
+                  >
+                    +
+                  </button>
+                </div>
+                <div class="inspector-empty" id="inspector-empty">
+                  <span aria-hidden="true">↖</span>
+                  <p>Choose an item on the plan to adjust its position, size or future purpose.</p>
+                </div>
+                <form id="item-form" hidden>
+                  <div class="selected-item-heading">
+                    <span id="selected-symbol" class="item-symbol" aria-hidden="true">▭</span>
+                    <div>
+                      <strong id="selected-name">Item</strong
+                      ><span id="selected-status" class="status-label">Owned</span>
+                    </div>
+                    <button
+                      class="icon-button"
+                      type="button"
+                      id="delete-item"
+                      aria-label="Remove selected item"
+                      title="Remove selected item"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <label>Item name<input name="name" required maxlength="80" /></label>
+                  <div class="form-pair">
+                    <label
+                      >Category<select name="category">
+                        <option value="bed">Bed</option>
+                        <option value="desk">Desk</option>
+                        <option value="wardrobe">Wardrobe</option>
+                        <option value="chair">Chair</option>
+                        <option value="shelf">Shelf</option>
+                        <option value="lamp">Lamp</option>
+                        <option value="rug">Rug / mat</option>
+                        <option value="curtain">Curtain</option>
+                        <option value="storage">Storage</option>
+                        <option value="other">Something else</option>
+                      </select></label
+                    ><label
+                      >Already own it?<select name="status">
+                        <option value="owned">Already mine</option>
+                        <option value="planned">For later</option>
+                      </select></label
+                    >
+                  </div>
+                  <div class="form-pair">
+                    <label
+                      >Width <span class="unit">cm</span
+                      ><input name="width_cm" type="number" min="1" step="0.5" required /></label
+                    ><label
+                      >Depth <span class="unit">cm</span
+                      ><input name="depth_cm" type="number" min="1" step="0.5" required
+                    /></label>
+                  </div>
+                  <div class="form-pair">
+                    <label
+                      >Height limit <span class="unit">cm</span
+                      ><input name="height_cm" type="number" min="0" step="0.5" required
+                    /></label>
+                    <div class="field-help" style="align-self: center">
+                      For planned items, width, depth and height define the maximum purchase size.
+                    </div>
+                  </div>
+                  <div class="position-box">
+                    <div class="position-label">
+                      POSITION <span id="position-origin">from top-left of room</span>
+                    </div>
+                    <div class="form-pair">
+                      <label
+                        >Across / X <span class="unit">cm</span
+                        ><input name="x_cm" type="number" step="0.5" required /></label
+                      ><label
+                        >Down / Y <span class="unit">cm</span
+                        ><input name="y_cm" type="number" step="0.5" required
+                      /></label>
+                    </div>
+                    <div class="rotation-row">
+                      <span id="rotation-value">Rotation 0°</span
+                      ><button type="button" class="small-button" id="rotate-item">
+                        ↻ Rotate 90°
+                      </button>
+                    </div>
+                  </div>
+                  <div class="form-pair">
+                    <label
+                      >Lives on<select name="placement">
+                        <option value="floor">The floor</option>
+                        <option value="surface">Another item</option>
+                        <option value="wall">A wall</option>
+                        <option value="overlay">Floor overlay / rug</option>
+                      </select></label
+                    ><label id="parent-label" hidden
+                      >On which item?<select name="parent_id"></select></label
+                    ><label id="budget-label"
+                      >Target delivered <span class="unit">€</span
+                      ><input
+                        name="target_price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Optional"
+                    /></label>
+                  </div>
+                  <div class="form-pair">
+                    <label
+                      >Access space <span class="unit">cm</span
+                      ><input name="clearance_cm" type="number" min="0" step="1" /><span
+                        class="field-help"
+                        >Added around floor furniture.</span
+                      ></label
+                    ><label>Plan colour<input name="color" type="color" value="#c99872" /></label>
+                  </div>
+                  <label
+                    >Notes<textarea
+                      name="notes"
+                      rows="2"
+                      maxlength="500"
+                      placeholder="e.g. Leave this corner for a study desk."
+                    ></textarea>
+                  </label>
+                  <label class="checkbox-label"
+                    ><input name="locked" type="checkbox" />Keep this item fixed on the plan.</label
+                  >
+                  <div id="item-issues" class="item-issues" aria-live="polite"></div>
+                  <button type="button" class="primary-button full-width" id="suggest-positions">
+                    Find another position <span aria-hidden="true">↗</span>
+                  </button>
+                  <div id="suggestions" class="suggestions" hidden></div>
+                  <button type="button" class="text-button full-width" id="shop-item">
+                    Find something for this place →
+                  </button>
+                </form>
+              </aside>
+            </div>
+            <div class="room-bottom-grid">
+              <section class="panel inventory-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>What’s in your room</h2>
+                    <p>Small things belong here too.</p>
+                  </div>
+                  <button class="small-button" id="add-item-bottom">+ Add item</button>
+                </div>
+                <div id="inventory-list" class="inventory-list"></div>
+              </section>
+              <section class="panel room-check-panel">
+                <div class="panel-heading">
+                  <div>
+                    <p class="eyebrow small">BEFORE YOU MOVE ANYTHING</p>
+                    <h2 id="room-check-heading">Room check</h2>
+                  </div>
+                  <span class="check-icon" id="room-check-icon" aria-hidden="true">✓</span>
+                </div>
+                <div id="room-issues" class="room-issues"></div>
+                <p class="practical-note">
+                  This is a measured concept plan. Check the actual room, door swing and walking
+                  space before buying or moving furniture.
+                </p>
+              </section>
+            </div>
+          </section>
+          <section class="view" id="view-wishlist" hidden aria-labelledby="wishlist-heading">
+            <div class="page-heading compact">
+              <div>
+                <p class="eyebrow">A PLACE FOR WHAT COMES NEXT</p>
+                <h1 id="wishlist-heading">Worth making<br /><em>space for.</em></h1>
+                <p class="heading-copy">
+                  A wishlist that remembers your room, your budget and the details.
+                </p>
+              </div>
+              <button class="primary-button" id="add-product">+ Add a find</button>
+            </div>
+            <div class="notice neutral-notice">
+              <span aria-hidden="true">↳</span>
+              <div>
+                <strong>A lower price is only half the story.</strong>
+                <p>
+                  A purchase recommendation needs a confirmed room, clear placement, matching
+                  variant, known delivery price and stock. Item-price changes can be shown
+                  separately. Demo observations never become deal alerts.
+                </p>
+              </div>
+            </div>
+            <div class="wish-toolbar">
+              <div class="segmented" role="group" aria-label="Filter wishlist">
+                <button class="active" data-wish-filter="all">All finds</button
+                ><button data-wish-filter="ready">Ready to consider</button
+                ><button data-wish-filter="waiting">Still watching</button>
+              </div>
+              <button class="small-button" id="check-all">↻ Check supported links</button>
+            </div>
+            <div id="wishlist-grid" class="wishlist-grid"></div>
+            <div id="wishlist-empty" class="empty-state" hidden>
+              <span aria-hidden="true">♡</span>
+              <h2>Your next good find starts here.</h2>
+              <p>
+                Reserve a place in the room, then add a product with its exact size, variant and
+                delivered-price target.
+              </p>
+              <button class="primary-button" id="add-product-empty">+ Add a find</button>
+            </div>
+          </section>
+          <section class="view" id="view-journal" hidden aria-labelledby="journal-heading">
+            <div class="page-heading compact">
+              <div>
+                <p class="eyebrow">LESS GUESSING. A LITTLE MORE PATIENCE.</p>
+                <h1 id="journal-heading">Keep an eye<br /><em>on the price.</em></h1>
+                <p class="heading-copy">
+                  Keep dated observations. Know what changed before deciding to buy.
+                </p>
+              </div>
+              <button class="primary-button" id="journal-add-observation">+ Record a price</button>
+            </div>
+            <div class="journal-grid">
+              <section class="panel chart-panel">
+                <div class="panel-heading">
+                  <div>
+                    <h2>Price over time</h2>
+                    <p>Product + delivery, when both are known.</p>
+                  </div>
+                  <label class="sr-only" for="journal-product">Choose a product</label
+                  ><select id="journal-product"></select>
+                </div>
+                <div id="price-chart" class="price-chart"></div>
+                <div id="chart-caption" class="chart-caption"></div>
+              </section>
+              <aside class="panel tracking-panel">
+                <p class="eyebrow small">THE WATCH LIST</p>
+                <h2>Checks that stay useful</h2>
+                <p class="muted">
+                  Manual entries work for any store. Automatic checks work only for supported public
+                  product pages.
+                </p>
+                <div id="tracker-status" class="tracker-status"></div>
+                <button class="small-button full-width" id="journal-check-all">
+                  ↻ Check supported links now
+                </button>
+                <div class="tracker-warning">
+                  A check failure keeps your previous observation. It does not create a new price.
+                </div>
+              </aside>
+            </div>
+            <section class="panel history-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>The observation log</h2>
+                  <p>Source, date, delivery and variant stay attached to each entry.</p>
+                </div>
+                <button class="small-button" id="export-prices">↓ Export CSV</button>
+              </div>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Product price</th>
+                      <th>Delivery</th>
+                      <th>Delivered</th>
+                      <th>Stock</th>
+                      <th>Source</th>
+                      <th>Variant</th>
+                    </tr>
+                  </thead>
+                  <tbody id="history-body"></tbody>
+                </table>
+              </div>
+            </section>
+            <section class="panel notification-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Useful updates for your room</h2>
+                  <p>Item-price changes and qualified purchase alerts are labelled separately.</p>
+                </div>
+                <span class="small-pill" id="notification-count">0 new</span>
+              </div>
+              <div id="notification-list"></div>
+            </section>
+          </section>
+          <footer class="site-footer">
+            <span>RoomMate · Built for the room you actually live in.</span
+            ><a href="/guide" target="_blank" rel="noopener">The project, step by step ↗</a>
+          </footer>
+        </main>
+      </div>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <dialog id="room-dialog" class="wide-dialog">
+      <form id="room-settings-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow small">START WITH WHAT’S REAL</p>
+            <h2>Your room measurements</h2>
+          </div>
+          <button type="button" class="icon-button close-dialog" aria-label="Close room settings">
+            ×
+          </button>
+        </div>
+        <p class="muted">
+          Measure wall to wall. This version supports a rectangular room; use fixed obstacles for
+          columns or built-in furniture.
+        </p>
+        <label>Room name<input name="name" required maxlength="80" /></label>
+        <div class="form-pair">
+          <label
+            >Width <span class="unit">cm</span
+            ><input name="width_cm" type="number" min="100" max="3000" step="0.5" required /></label
+          ><label
+            >Depth <span class="unit">cm</span
+            ><input name="depth_cm" type="number" min="100" max="3000" step="0.5" required
+          /></label>
+        </div>
+        <div class="form-pair">
+          <label
+            >Room height <span class="unit">cm</span
+            ><input
+              name="height_cm"
+              type="number"
+              min="100"
+              max="1000"
+              step="0.5"
+              required /></label
+          ><label
+            >Upgrade budget <span class="unit">€</span
+            ><input name="budget_eur" type="number" min="0" step="0.01"
+          /></label>
+        </div>
+        <div class="form-pair">
+          <label>Wall colour<input name="wall_color" type="color" value="#a4b497" /></label>
+          <label>Floor colour<input name="floor_color" type="color" value="#f4f6ed" /></label>
+        </div>
+        <p class="field-help">Colours give a rough plan preview. Real materials and light will look different.</p>
+        <label
+          >Style / atmosphere<input
+            name="style"
+            maxlength="120"
+            placeholder="e.g. Warm wood, cream walls and a little green" /></label
+        ><label
+          >Room notes<textarea
+            name="notes"
+            rows="2"
+            maxlength="4000"
+            placeholder="e.g. Socket beside the desk; heater under the window."
+          ></textarea></label
+        ><label class="checkbox-label confirmation-label"
+          ><input name="confirmed" type="checkbox" />I measured this room and confirmed the openings
+          and obstacles below.</label
+        >
+        <div class="settings-section-title">
+          <h3>Doors & windows</h3>
+          <button type="button" class="small-button" id="add-opening">+ Add opening</button>
+        </div>
+        <p class="field-help">
+          Offset is measured from the top/left end of that wall. Keep-clear depth reserves a
+          rectangular area inside the room.
+        </p>
+        <div id="openings-editor" class="repeater-list"></div>
+        <div class="settings-section-title">
+          <h3>Fixed obstacles</h3>
+          <button type="button" class="small-button" id="add-obstacle">+ Add obstacle</button>
+        </div>
+        <div id="obstacles-editor" class="repeater-list"></div>
+        <p id="room-settings-error" class="form-error" hidden role="alert"></p>
+        <div class="dialog-actions">
+          <button type="button" class="quiet-button close-dialog">Cancel</button
+          ><button class="primary-button" type="submit">Save my room →</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="product-dialog" class="wide-dialog">
+      <form id="product-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow small">MAKE IT A GOOD FIT</p>
+            <h2 id="product-dialog-title">Add a find</h2>
+          </div>
+          <button type="button" class="icon-button close-dialog" aria-label="Close product form">
+            ×
+          </button>
+        </div>
+        <label
+          >Product name<input
+            name="name"
+            required
+            maxlength="120"
+            placeholder="e.g. A small oak study desk"
+        /></label>
+        <div class="form-pair">
+          <label>Reserved place<select name="item_id" required></select></label
+          ><label
+            >Delivered-price target <span class="unit">€</span
+            ><input name="target_price" type="number" min="0.01" step="0.01" required
+          /></label>
+        </div>
+        <label
+          >Exact product / variant URL<input
+            name="url"
+            type="url"
+            required
+            placeholder="https://store.example/product"
+        /></label>
+        <div class="form-pair">
+          <label
+            >Width <span class="unit">cm</span
+            ><input name="width_cm" type="number" min="0.1" step="0.1" required /></label
+          ><label
+            >Depth <span class="unit">cm</span
+            ><input name="depth_cm" type="number" min="0.1" step="0.1" required
+          /></label>
+        </div>
+        <div class="form-pair">
+          <label
+            >Height <span class="unit">cm</span
+            ><input
+              name="height_cm"
+              type="number"
+              min="0.1"
+              step="0.1"
+              placeholder="Needed for full fit check" /></label
+          ><label
+            >Colour / finish<input name="color" maxlength="80" placeholder="e.g. Oak / cream"
+          /></label>
+        </div>
+        <div class="form-pair">
+          <label
+            >Retailer / store<input name="retailer" maxlength="100" placeholder="Optional" /></label
+          ><label
+            >Retailer SKU / product code<input
+              name="sku"
+              maxlength="100"
+              placeholder="Exact code from product page"
+          /></label>
+        </div>
+        <p class="field-help">
+          Live quotes need an exact SKU match and your saved variant confirmation. Without that
+          match, a live price stays unconfirmed.
+        </p>
+        <label
+          >Exact variant<input
+            name="variant"
+            maxlength="200"
+            required
+            placeholder="e.g. 100 × 50 cm, oak finish" /></label
+        ><label class="checkbox-label"
+          ><input name="variant_confirmed" type="checkbox" />I confirmed these dimensions and this
+          link are for the exact variant.</label
+        ><label class="checkbox-label"
+          ><input name="rotation_allow90" type="checkbox" checked />This item can fit the reserved
+          place when turned 90°.</label
+        ><label class="checkbox-label"
+          ><input name="monitor" type="checkbox" />Watch this public link every 6 hours while the
+          local server runs.</label
+        ><label
+          >Notes<textarea
+            name="notes"
+            rows="2"
+            maxlength="500"
+            placeholder="What matters to you about this item?"
+          ></textarea>
+        </label>
+        <p class="field-help">
+          Record a price after adding the product. Dimensions must describe the exact variant you
+          intend to buy.
+        </p>
+        <p id="product-error" class="form-error" hidden role="alert"></p>
+        <button id="delete-product" type="button" class="text-button" hidden>
+          Remove this find and its price history
+        </button>
+        <div class="dialog-actions">
+          <button type="button" class="quiet-button close-dialog">Cancel</button
+          ><button class="primary-button" type="submit">Save this find →</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="observation-dialog">
+      <form id="observation-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow small">KEEP THE EVIDENCE WITH THE PRICE</p>
+            <h2>Record an observation</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button close-dialog"
+            aria-label="Close price observation"
+          >
+            ×
+          </button>
+        </div>
+        <label>Product<select name="product_id" required></select></label
+        ><label>Observed at<input name="observed_at" type="datetime-local" required /></label>
+        <div class="form-pair">
+          <label
+            >Product price <span class="unit">€</span
+            ><input name="price" type="number" min="0" step="0.01" required /></label
+          ><label
+            >Delivery <span class="unit">€</span
+            ><input
+              name="shipping"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Unknown = leave blank"
+          /></label>
+        </div>
+        <p class="field-help">
+          Enter 0 only when delivery is confirmed free. A blank amount means unknown.
+        </p>
+        <label
+          >Stock<select name="availability">
+            <option value="unknown">Not confirmed</option>
+            <option value="in_stock">In stock</option>
+            <option value="out_of_stock">Out of stock</option>
+          </select></label
+        ><label class="checkbox-label"
+          ><input name="variant_confirmed" type="checkbox" />I checked that this price belongs to
+          the exact product variant.</label
+        ><label
+          >Source / evidence URL<input
+            name="source_url"
+            type="url"
+            required
+            placeholder="https://store.example/product" /></label
+        ><label
+          >Observation notes<textarea
+            name="notes"
+            rows="2"
+            maxlength="500"
+            placeholder="e.g. Delivery checked for my postcode."
+          ></textarea>
+        </label>
+        <p id="observation-error" class="form-error" hidden role="alert"></p>
+        <div class="dialog-actions">
+          <button type="button" class="quiet-button close-dialog">Cancel</button
+          ><button class="primary-button" type="submit">Record price →</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="data-dialog">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow small">YOUR WORKSPACE, YOUR FILE</p>
+          <h2>Take your plan with you</h2>
+        </div>
+        <button type="button" class="icon-button close-dialog" aria-label="Close data controls">
+          ×
+        </button>
+      </div>
+      <p class="muted">
+        Export a backup with your room, finds and observations. Importing replaces the current
+        workspace after confirmation.
+      </p>
+      <div class="data-actions">
+        <a class="primary-button" href="/api/export?format=json" download>↓ Export full workspace</a
+        ><a class="small-button" href="/api/export?format=csv" download
+          >↓ Export price journal CSV</a
+        ><label class="small-button file-button"
+          >↑ Choose a workspace file<input
+            type="file"
+            id="import-file"
+            accept="application/json,.json"
+            class="sr-only"
+        /></label>
+      </div>
+      <div id="import-preview" hidden>
+        <p id="import-description"></p>
+        <button class="danger-button" id="confirm-import">Replace workspace with this file</button>
+      </div>
+      <p id="import-error" class="form-error" hidden role="alert"></p>
+    </dialog>
+  </body>
+</html>

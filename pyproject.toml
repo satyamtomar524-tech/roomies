@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roommate-student-planner"
+version = "1.0.0"
+description = "A local student room planner with future-space reservations and a price journal."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{name = "Satyam Tomar"}]
+dependencies = []
+
+[project.scripts]
+roommate = "roommate.server:main"
+
+[tool.setuptools]
+packages = ["roommate"]
+
+[tool.setuptools.data-files]
+"share/roommate/web" = ["web/index.html", "web/style.css", "web/app.js", "web/guide.html", "web/guide.css"]
