@@ -39,6 +39,8 @@ On Linux, Playwright may need `npx playwright install --with-deps chromium`. `RO
 
 GitHub Actions is configured for Python 3.10, 3.12 and 3.13, JavaScript syntax, and a Chromium browser workflow. Only Python 3.12 was executed locally; the other Python versions are covered by the remote workflow.
 
+The browser job uses Chrome already installed on the Ubuntu 24.04 runner, selected through `ROOMMATE_BROWSER_PATH`. This runs the same smoke test without installing a second browser and its operating-system dependencies. The [runner's software inventory](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md) documents its available browser.
+
 ## Important regressions covered
 
 - A planned desk reserves its footprint; a surface lamp does not consume additional floor area.
