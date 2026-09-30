@@ -23,6 +23,8 @@ The room starts with a clearly labelled **3 × 3.5 m sample**. It is there to tr
 
 ## Open it in your browser
 
+**[Try Roomies →](https://roomies-satyam.satyamtomar524.chatgpt.site)**
+
 The public browser version lets friends try Roomies without installing Python. Each person gets their own workspace, saved on that device. The Share Roomies button shares the website, not your records. Export a backup before clearing browser data or changing devices.
 
 Room planning, flat and kitchen lists, shared costs, repayments, monthly bills and manual price records work in the browser. It has no shared accounts or live sync between flatmates. Automatic retailer checks remain a feature of the local app below.

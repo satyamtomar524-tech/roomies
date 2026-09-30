@@ -1,5 +1,7 @@
 # A link my friends can open
 
+**Public website: [Open Roomies](https://roomies-satyam.satyamtomar524.chatgpt.site)**
+
 The Python app originally needed a terminal running on my laptop. That was fine for development, but awkward for someone who only wanted to try the idea.
 
 The browser build keeps the same interface and the same Python rules. Pyodide runs Python in a separate browser worker, so calculations do not block the page. The worker uses the existing SQLite storage and saves the database in IndexedDB after every accepted write. There is no public server holding everyone's flat records.
