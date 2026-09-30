@@ -227,6 +227,17 @@ async function main() {
       const saveBox = await saveExpense.boundingBox();
       assert(saveBox && saveBox.y >= 0 && saveBox.y + saveBox.height <= 844, `Expense save button is reachable at ${width}px`);
       await page.keyboard.press('Escape');
+      if (!await page.locator('#monthly-bills-panel').evaluate(element => element.open)) {
+        await page.locator('#monthly-bills-panel > summary').click();
+      }
+      for (const [button, form] of [['#add-repayment', '#repayment-form'], ['#add-monthly-bill', '#monthly-bill-form']]) {
+        await page.locator(button).click();
+        const save = page.locator(`${form} button[type="submit"]`);
+        await save.scrollIntoViewIfNeeded();
+        const bounds = await save.boundingBox();
+        assert(bounds && bounds.y >= 0 && bounds.y + bounds.height <= 844, `${form} save button is reachable at ${width}px`);
+        await page.keyboard.press('Escape');
+      }
       await page.locator('#data-menu-top').click();
       assert(await page.locator('#data-dialog').isVisible());
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
@@ -235,7 +246,7 @@ async function main() {
     await page.goto(`${base}/guide`);
     assert.match(await page.locator('body').innerText(), /Roomies/);
     assert.deepEqual(errors, []);
-    console.log('PASS: room geometry and editing, product quotes and alerts, flat members and belongings, kitchen checklist, exact shared balances, full backup, guide, and all 320/390px layouts.');
+    console.log('PASS: room planning, prices, belongings, kitchen, shared costs, repayments, monthly bills, backup, guide, and 320/390px layouts.');
     console.log(`Disposable test evidence: ${path.relative(root, results)}`);
   } finally {
     if (browser) await browser.close();

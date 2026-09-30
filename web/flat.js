@@ -17,7 +17,11 @@ function ensureHousehold() {
     inventory: [],
     fridge: [],
     expenses: [],
+    repayments: [],
+    monthly_bills: [],
   };
+  state.flat.repayments ||= [];
+  state.flat.monthly_bills ||= [];
   state.flat_summary ||= {
     inventory_count: 0,
     inventory_quantity: 0,
@@ -608,7 +612,7 @@ function renderExpenses() {
               node(
                 "small",
                 {},
-                `${moneyCents(balance.paid_cents)} paid · ${moneyCents(balance.share_cents)} share`,
+                `${moneyCents(balance.paid_cents)} on bills · ${moneyCents(balance.share_cents)} share`,
               ),
             ),
           );
@@ -647,6 +651,9 @@ function renderExpenses() {
               `${memberName(payment.from_id)} → ${memberName(payment.to_id)}`,
             ),
             node("strong", {}, moneyCents(payment.amount_cents)),
+            recordButton("Record repayment", () =>
+              openRepayment(null, payment),
+            ),
           ),
         )
       : [
@@ -728,6 +735,7 @@ function renderExpenses() {
           ),
         ]),
   );
+  renderCostExtras();
 }
 
 function renderHousehold() {
@@ -743,6 +751,13 @@ function memberReferenced(memberId) {
     state.flat.inventory.some((record) => record.owner_id === memberId) ||
     state.flat.fridge.some((record) => record.owner_id === memberId) ||
     state.flat.expenses.some(
+      (record) =>
+        record.paid_by === memberId || record.split_between.includes(memberId),
+    ) ||
+    state.flat.repayments.some(
+      (record) => record.from_id === memberId || record.to_id === memberId,
+    ) ||
+    state.flat.monthly_bills.some(
       (record) =>
         record.paid_by === memberId || record.split_between.includes(memberId),
     )
@@ -880,11 +895,16 @@ function openFridgeItem(itemId = null) {
   $("#fridge-dialog").showModal();
 }
 
-function openExpense(expenseId = null) {
+function openExpense(expenseId = null, draft = null) {
   const form = $("#expense-form");
   form.reset();
-  const expense = state.flat.expenses.find((record) => record.id === expenseId);
-  form.elements.id.value = expense?.id || "";
+  const savedExpense = state.flat.expenses.find(
+    (record) => record.id === expenseId,
+  );
+  const expense = savedExpense || draft;
+  form.elements.id.value = savedExpense?.id || "";
+  form.elements.bill_id.value = expense?.bill_id || "";
+  $("#expense-source-note").hidden = !expense?.bill_id;
   form.elements.title.value = expense?.title || "";
   form.elements.amount.value = expense
     ? expenseAmountInput(expense.amount_cents)
@@ -926,9 +946,11 @@ function openExpense(expenseId = null) {
       );
     }),
   );
-  $("#expense-dialog-title").textContent = expense
+  $("#expense-dialog-title").textContent = savedExpense
     ? "Edit shared cost"
-    : "Add a shared cost";
+    : draft
+      ? "Record monthly bill"
+      : "Add a shared cost";
   $("#expense-error").hidden = true;
   $("#expense-dialog").showModal();
 }
@@ -999,6 +1021,10 @@ async function submitFlatRecord(event, kind) {
           category: formValue(form, "category"),
           notes: formValue(form, "notes"),
         };
+        if (form.elements.bill_id.value) {
+          record.bill_id = form.elements.bill_id.value;
+          record.bill_month = record.date.slice(0, 7);
+        }
       }
       await updateFlat((flat) => {
         const position = flat[kind].findIndex((item) => item.id === record.id);
@@ -1023,6 +1049,7 @@ async function submitFlatRecord(event, kind) {
 }
 
 function wireHouseholdEvents() {
+  wireCostEvents();
   $("#room-settings-local").addEventListener("click", openRoomSettings);
   [
     "flat-settings-button",

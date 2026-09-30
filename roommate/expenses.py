@@ -8,6 +8,7 @@ Settlement suggestions describe the current ledger; they do not send money.
 from __future__ import annotations
 
 from datetime import date
+from calendar import monthrange
 import re
 from typing import Any
 
@@ -21,7 +22,10 @@ CATEGORIES = ("groceries", "rent", "utilities", "household", "other")
 EXPENSE_FIELDS = {
     "id", "title", "amount_cents", "paid_by", "split_between", "date",
     "category", "notes",
+    "bill_id", "bill_month",
 }
+REPAYMENT_FIELDS = {"id", "from_id", "to_id", "amount_cents", "date", "notes"}
+MONTHLY_BILL_FIELDS = (EXPENSE_FIELDS - {"date", "bill_id", "bill_month"}) | {"due_day", "active"}
 
 
 def _identity(value: Any, label: str) -> str:
@@ -39,11 +43,21 @@ def _text(value: Any, label: str, maximum: int, *, required: bool = False) -> st
     return value
 
 
-def _amount(value: Any) -> int:
+def _amount(value: Any, label: str = "Expense") -> int:
     if isinstance(value, bool) or not isinstance(value, int):
-        raise ValidationError("Expense amount must be a whole number of cents.")
+        raise ValidationError(f"{label} amount must be a whole number of cents.")
     if not 1 <= value <= MAX_AMOUNT_CENTS:
-        raise ValidationError("Expense amount must be between €0.01 and €1,000,000.")
+        raise ValidationError(f"{label} amount must be between €0.01 and €1,000,000.")
+    return value
+
+
+def _date(value: Any, label: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value) is None:
+        raise ValidationError(f"{label} date must use YYYY-MM-DD.")
+    try:
+        date.fromisoformat(value)
+    except ValueError as error:
+        raise ValidationError(f"{label} date must be a real calendar date.") from error
     return value
 
 
@@ -94,19 +108,13 @@ def validate_expense(data: Any, members: Any) -> dict:
     if payer not in member_ids or any(member_id not in member_ids for member_id in participants):
         raise ValidationError("Every expense payer and participant must be a current flat member.")
 
-    expense_date = data.get("date")
-    if not isinstance(expense_date, str) or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", expense_date) is None:
-        raise ValidationError("Expense date must use YYYY-MM-DD.")
-    try:
-        date.fromisoformat(expense_date)
-    except ValueError as error:
-        raise ValidationError("Expense date must be a real calendar date.") from error
+    expense_date = _date(data.get("date"), "Expense")
 
     category = data.get("category", "other")
     if not isinstance(category, str) or category not in CATEGORIES:
         raise ValidationError(f"Expense category must be one of: {', '.join(CATEGORIES)}.")
 
-    return {
+    result = {
         "id": _identity(data.get("id"), "Expense ID"),
         "title": _text(data.get("title"), "Expense title", 120, required=True),
         "amount_cents": _amount(data.get("amount_cents")),
@@ -116,6 +124,61 @@ def validate_expense(data: Any, members: Any) -> dict:
         "category": category,
         "notes": _text(data.get("notes", ""), "Expense notes", 2000),
     }
+    if "bill_id" in data or "bill_month" in data:
+        result["bill_id"] = _identity(data.get("bill_id"), "Monthly bill ID")
+        if data.get("bill_month") != expense_date[:7]:
+            raise ValidationError("The monthly bill period must match the expense date's month.")
+        result["bill_month"] = data["bill_month"]
+    return result
+
+
+def validate_repayment(data: Any, members: Any) -> dict:
+    """A record of money already sent between two members, not another expense."""
+    member_ids = {member["id"] for member in _members(members)}
+    if not isinstance(data, dict) or set(data) - REPAYMENT_FIELDS:
+        raise ValidationError("A repayment must contain only its ID, people, amount, date and notes.")
+    sender = _identity(data.get("from_id"), "Sender ID")
+    recipient = _identity(data.get("to_id"), "Recipient ID")
+    if sender not in member_ids or recipient not in member_ids:
+        raise ValidationError("Both repayment people must be current flat members.")
+    if sender == recipient:
+        raise ValidationError("Choose two different people for a repayment.")
+    return {
+        "id": _identity(data.get("id"), "Repayment ID"),
+        "from_id": sender, "to_id": recipient,
+        "amount_cents": _amount(data.get("amount_cents"), "Repayment"),
+        "date": _date(data.get("date"), "Repayment"),
+        "notes": _text(data.get("notes", ""), "Repayment notes", 1000),
+    }
+
+
+def validate_monthly_bill(data: Any, members: Any) -> dict:
+    """Save reusable bill details without creating a charge or assuming payment."""
+    if not isinstance(data, dict) or set(data) - MONTHLY_BILL_FIELDS:
+        raise ValidationError("The monthly bill contains unsupported fields.")
+    base = {key: value for key, value in data.items() if key not in ("due_day", "active")}
+    base["date"] = "2000-01-01"
+    result = validate_expense(base, members)
+    result.pop("date")
+    day = data.get("due_day")
+    if isinstance(day, bool) or not isinstance(day, int) or not 1 <= day <= 31:
+        raise ValidationError("The monthly due day must be a whole number from 1 to 31.")
+    active = data.get("active", True)
+    if not isinstance(active, bool):
+        raise ValidationError("The monthly bill's active flag must be true or false.")
+    result.update(due_day=day, active=active)
+    return result
+
+
+def monthly_bill_status(bills: list[dict], expenses: list[dict], on: date | None = None) -> list[dict]:
+    """Show this month's due date and recorded bill; short months use their last day."""
+    on = on or date.today()
+    period = f"{on.year:04d}-{on.month:02d}"
+    recorded = {entry["bill_id"]: entry["id"] for entry in expenses
+                if entry.get("bill_month") == period}
+    return [{"bill_id": bill["id"],
+             "due_date": f"{period}-{min(bill['due_day'], monthrange(on.year, on.month)[1]):02d}",
+             "expense_id": recorded.get(bill["id"])} for bill in bills]
 
 
 def expense_shares(expense: dict) -> dict[str, int]:
@@ -131,7 +194,7 @@ def expense_shares(expense: dict) -> dict[str, int]:
     }
 
 
-def summarize_expenses(expenses: Any, members: Any) -> dict:
+def summarize_expenses(expenses: Any, members: Any, repayments: Any = None) -> dict:
     """Calculate balances and deterministic transfers that clear those balances.
 
     Positive balances are money owed to a member; negative balances are money
@@ -141,6 +204,9 @@ def summarize_expenses(expenses: Any, members: Any) -> dict:
     member_records = _members(members)
     if not isinstance(expenses, list) or len(expenses) > MAX_EXPENSES:
         raise ValidationError("Expenses must be a list of at most 500 entries.")
+    repayments = [] if repayments is None else repayments
+    if not isinstance(repayments, list) or len(repayments) > 500:
+        raise ValidationError("Repayments must be a list of at most 500 entries.")
 
     balances = {
         member["id"]: {
@@ -151,11 +217,17 @@ def summarize_expenses(expenses: Any, members: Any) -> dict:
     }
     total = 0
     expense_ids = set()
+    bill_periods = set()
     for value in expenses:
         expense = validate_expense(value, member_records)
         if expense["id"] in expense_ids:
             raise ValidationError("Expense IDs must be unique.")
         expense_ids.add(expense["id"])
+        if "bill_id" in expense:
+            period = (expense["bill_id"], expense["bill_month"])
+            if period in bill_periods:
+                raise ValidationError("This monthly bill has already been recorded for that month.")
+            bill_periods.add(period)
         total += expense["amount_cents"]
         balances[expense["paid_by"]]["paid_cents"] += expense["amount_cents"]
         for member_id, share in expense_shares(expense).items():
@@ -163,6 +235,15 @@ def summarize_expenses(expenses: Any, members: Any) -> dict:
 
     for balance in balances.values():
         balance["balance_cents"] = balance["paid_cents"] - balance["share_cents"]
+
+    repayment_ids = set()
+    for value in repayments:
+        repayment = validate_repayment(value, member_records)
+        if repayment["id"] in repayment_ids:
+            raise ValidationError("Repayment IDs must be unique.")
+        repayment_ids.add(repayment["id"])
+        balances[repayment["from_id"]]["balance_cents"] += repayment["amount_cents"]
+        balances[repayment["to_id"]]["balance_cents"] -= repayment["amount_cents"]
 
     debtors = sorted(
         [[entry["member_id"], -entry["balance_cents"]] for entry in balances.values()

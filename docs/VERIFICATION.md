@@ -1,24 +1,26 @@
 # Verification record
 
-Checked on 30 September 2026 for Roomies 2.0. This records local evidence. Remote results are available in the repository's [workflow run history](https://github.com/satyamtomar524-tech/roomies/actions).
+Checked on 30 September 2026 for Roomies 2.1. This records local evidence. Remote results are available in the repository's [workflow run history](https://github.com/satyamtomar524-tech/roomies/actions).
 
 ## Results
 
 | Check | Result |
 |---|---|
-| Python behavioral suite | **161 passed** on Python 3.12.14 / Windows |
+| Python behavioral suite | **182 passed** on Python 3.12.14 / Windows |
 | JavaScript syntax | Passed with Node 24.19.0 |
 | Complete browser workflow | Passed using Playwright 1.62.1 and isolated headless Chrome 154.0.8037.58 |
-| Responsive pages | No horizontal overflow in all seven views at 320 px and 390 px; shared-cost dialog controls remain reachable |
+| Responsive pages | No horizontal overflow in all seven views at 320 px and 390 px; expense, repayment and monthly-bill dialog controls remain reachable |
 | Browser runtime | No uncaught page errors in the tested workflow |
-| Visual inspection | Desktop and mobile home, room and kitchen screenshots, plus the narrow expense dialog, inspected |
-| Python distribution | Version 2.0 wheel built and installed into a fresh virtual environment; all six web assets, installed HTTP server and Roomies CLI verified outside the source checkout |
+| Visual inspection | Desktop and mobile home, room and kitchen screens, a narrow expense dialog, and a clearly fictional shared-cost example inspected |
+| Python distribution | Version 2.1 wheel built and installed into a fresh virtual environment; all seven web assets, installed HTTP server and Roomies CLI verified outside the source checkout |
 
 The Python suite covers geometry, prices, HTTP/API routes, SQLite persistence, scheduling, household validation and shared expenses. The browser check uses a fresh disposable database, synthetic belongings, people, bills, products and prices, and a stopped scheduler. It does not contact a retailer or modify the user's workspace.
 
 The browser workflow checks dragging, keyboard movement and rotation, numeric room edits, invalid geometry and recovery, suggested positions, wall/floor colours, product edits and SKU preservation, watch controls, manual quotes, fit and delivery eligibility, distinct alerts, notification read state, price history, SVG/CSV/JSON exports, backup import, the guide, and narrow layouts.
 
 It also creates flat members, adds and edits a belonging's location, searches inventory, blocks deletion of a referenced member, updates the kitchen checklist, creates/edits/removes shared costs, verifies exact balances, exports per-person shares and restores the full flat. A held background response verifies that a newly saved change survives an older read. A held checklist write verifies that import waits before restoring the backup. A bill imported with a different participant order verifies that a title-only edit preserves its odd-cent allocation.
+
+The completed cost workflow records, edits and removes a partial repayment, records the full amount to clear the balance, exports repayments, creates a monthly template without adding spending, records its reviewed bill, prevents another entry for the same month, changes the template without rewriting the old expense, pauses/resumes it, and restores both new lists from a full backup.
 
 ## Repeat the checks
 
@@ -28,6 +30,7 @@ From the repository directory:
 python -m unittest discover -s tests -v
 node --check web/app.js
 node --check web/flat.js
+node --check web/costs.js
 ```
 
 Browser tooling is optional; the application itself needs only Python. On a machine with Node and npm:
@@ -61,6 +64,9 @@ The browser job uses Chrome already installed on the Ubuntu 24.04 runner, select
 - Bills reject fractional cents, unknown members and duplicate participants. Shared balances sum to zero; suggested payments reconcile them exactly.
 - Every cent is allocated in saved participant order, including tiny bills and amounts that do not divide evenly.
 - Flat writes are serialized in the browser. Older polling responses cannot replace a newly accepted flat change.
+- Repayments change balances without increasing spending. Partial payments, overpayments, edits and deletions retain exact cent accounting.
+- Monthly due days respect short months and leap years. Templates create no charges by themselves. Duplicate bill/month pairs are rejected.
+- Schema 3 backups require the new lists. Older open tabs preserve omitted new lists when saving; legacy flat imports explicitly restore only the records in their backup.
 - Failed public checks retain the old observation but cannot turn it into a current purchase signal.
 - Local request checks, private-address rejection, redirect validation, crawling restrictions, response limits and ambiguous structured offers are exercised.
 
@@ -70,7 +76,7 @@ The live adapter was tested with controlled HTML and network fixtures. **No real
 
 No actual room measurements, user study, real savings or professional architectural validation were collected. The plan is a two-dimensional rectangle model, and colour previews are schematic. There is no photorealistic 3D view, irregular-room editor, cloud worker, email delivery or market-wide search. Socket/body limits do not impose one overall deadline across DNS, robots and redirects.
 
-Member names are local bookkeeping labels. Separate roommate accounts, multi-device synchronization, recurring bills and bank payments are not implemented. Suggested payments describe the outstanding ledger; they do not record an actual transfer. Kitchen dates are user-entered planning notes.
+Member names are local bookkeeping labels. Separate roommate accounts, multi-device synchronization and bank payments are not implemented. Repayments record what the user enters; no bank confirms those transfers. Monthly templates require a reviewed expense and do not automatically create bills. Kitchen dates are user-entered planning notes.
 
 The live parser leaves delivery unknown. Its informational price-drop notice is not proof of a delivered-price bargain. Quote history represents observations, not every market price between them.
 

@@ -7,6 +7,7 @@
     <title>Roomies · Your room and flat, organised</title>
     <link rel="stylesheet" href="/style.css" />
     <script src="/flat.js" defer></script>
+    <script src="/costs.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
@@ -16,9 +17,7 @@
         <a class="brand" href="/" aria-label="Roomies home"
           ><span class="brand-mark" aria-hidden="true">R</span
           ><span
-            >Roomies<span class="brand-note"
-              >A little more organised.</span
-            ></span
+            >Roomies<span class="brand-note">My room. Our flat.</span></span
           ></a
         >
         <div class="workspace-label">YOUR HOME</div>
@@ -103,10 +102,10 @@
             <div class="page-heading">
               <div>
                 <p class="eyebrow">YOUR EVERYDAY, TOGETHER</p>
-                <h1 id="home-heading">Your home, in one place.</h1>
+                <h1 id="home-heading">My room. My things. Our flat.</h1>
                 <p class="heading-copy">
-                  Plan your room, find your flat’s things and keep the shared
-                  bits clear.
+                  Work out what fits, remember where you kept it and sort out
+                  what you share.
                 </p>
               </div>
               <span class="home-date" id="home-date"></span>
@@ -150,7 +149,7 @@
             <div class="page-heading">
               <div>
                 <p class="eyebrow">MY FLAT</p>
-                <h1 id="flat-heading">Know where it lives.</h1>
+                <h1 id="flat-heading">Where did I keep it?</h1>
                 <p class="heading-copy">
                   Record flat belongings with their location, exact spot and
                   owner.
@@ -209,7 +208,7 @@
             <div class="page-heading">
               <div>
                 <p class="eyebrow">KITCHEN</p>
-                <h1 id="kitchen-heading">Keep the basics covered.</h1>
+                <h1 id="kitchen-heading">What’s in the kitchen?</h1>
                 <p class="heading-copy">
                   Find kitchen things and keep a fridge, freezer and pantry
                   checklist.
@@ -289,10 +288,10 @@
             <div class="page-heading">
               <div>
                 <p class="eyebrow">SHARED COSTS</p>
-                <h1 id="expenses-heading">Keep the split clear.</h1>
+                <h1 id="expenses-heading">Who owes what?</h1>
                 <p class="heading-copy">
-                  Record who paid, choose who shared it and see the balance in
-                  cents.
+                  Add a bill, choose who shared it and keep track of money paid
+                  back.
                 </p>
               </div>
               <button class="primary-button" id="add-expense">
@@ -303,7 +302,7 @@
               <section class="panel">
                 <div class="panel-heading">
                   <div>
-                    <h2>Who’s paid what</h2>
+                    <h2>Our balances</h2>
                     <p id="expense-total">No shared costs recorded.</p>
                   </div>
                   <button class="text-button" id="expense-people-button">
@@ -318,14 +317,14 @@
               <section class="panel sage-panel">
                 <div class="panel-heading">
                   <div>
-                    <h2>Suggested payments</h2>
-                    <p>A clear way to settle this ledger.</p>
+                    <h2>To settle up</h2>
+                    <p>Balances include the repayments you’ve recorded.</p>
                   </div>
                 </div>
                 <div id="settlements-list" class="panel-content"></div>
                 <p class="practical-note">
-                  Suggestions only. Roomies does not move money or connect to a
-                  bank. Record actual payments separately.
+                  Already paid someone back? Record it here. Roomies keeps the
+                  record; you make the payment yourself.
                 </p>
               </section>
             </div>
@@ -336,11 +335,44 @@
                   <p>Each bill can be shared by a different group.</p>
                 </div>
                 <button class="small-button" id="export-expenses">
-                  ↓ Export CSV
+                  ↓ Export bill shares
                 </button>
               </div>
               <div id="expense-list" class="household-list"></div>
             </section>
+            <section class="panel expense-history">
+              <div class="panel-heading">
+                <div>
+                  <h2>Money paid back</h2>
+                  <p>Repayments change the balance, not the spending total.</p>
+                </div>
+                <button class="small-button" id="add-repayment" disabled>
+                  + Record repayment
+                </button>
+              </div>
+              <div id="repayment-list" class="household-list"></div>
+              <div class="panel-content compact-export">
+                <button class="text-button" id="export-repayments" disabled>
+                  Download repayments CSV ↓
+                </button>
+              </div>
+            </section>
+            <details class="panel monthly-bills-panel" id="monthly-bills-panel">
+              <summary>
+                Rent & regular bills
+                <span id="monthly-bill-count" class="count-badge">0</span>
+              </summary>
+              <div class="panel-heading">
+                <p>
+                  Save the usual details. Record a bill after it’s paid, then
+                  check the amount and date.
+                </p>
+                <button class="small-button" id="add-monthly-bill">
+                  + Save monthly bill
+                </button>
+              </div>
+              <div id="monthly-bill-list" class="household-list"></div>
+            </details>
           </section>
           <section
             class="view"
@@ -1444,6 +1476,11 @@
             maxlength="120"
             placeholder="e.g. Weekly groceries"
         /></label>
+        <input type="hidden" name="bill_id" />
+        <p id="expense-source-note" class="field-help" hidden>
+          These are your saved bill details. Check who paid, the amount and the
+          date before recording it.
+        </p>
         <div class="form-pair">
           <label
             >Amount in EUR<input
@@ -1486,6 +1523,151 @@
           <button type="button" class="quiet-button close-dialog">Cancel</button
           ><button class="primary-button" type="submit">
             Save shared cost
+          </button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      id="repayment-dialog"
+      class="wide-dialog"
+      aria-labelledby="repayment-dialog-title"
+    >
+      <form id="repayment-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">MONEY PAID BACK</p>
+            <h2 id="repayment-dialog-title">Record a repayment</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button close-dialog"
+            aria-label="Close repayment form"
+          >
+            ×
+          </button>
+        </div>
+        <input type="hidden" name="id" />
+        <div class="form-pair">
+          <label>Who paid back?<select name="from_id" required></select></label>
+          <label>Who received it?<select name="to_id" required></select></label>
+        </div>
+        <div class="form-pair">
+          <label
+            >Amount in EUR<input
+              name="amount"
+              inputmode="decimal"
+              required
+              pattern="[0-9]+([.,][0-9]{1,2})?"
+              placeholder="e.g. 15.00"
+          /></label>
+          <label>Date paid<input name="date" type="date" required /></label>
+        </div>
+        <label
+          >Note, if useful<textarea
+            name="notes"
+            maxlength="1000"
+            rows="2"
+            placeholder="e.g. Bank transfer for groceries"
+          ></textarea>
+        </label>
+        <label class="check-label"
+          ><input name="confirmed" type="checkbox" required /> This payment has
+          already been made.</label
+        >
+        <p id="repayment-error" class="form-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="quiet-button close-dialog">Cancel</button
+          ><button type="submit" class="primary-button">Save repayment</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      id="monthly-bill-dialog"
+      class="wide-dialog"
+      aria-labelledby="monthly-bill-dialog-title"
+    >
+      <form id="monthly-bill-form">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">RENT & REGULAR BILLS</p>
+            <h2 id="monthly-bill-dialog-title">Save a monthly bill</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button close-dialog"
+            aria-label="Close monthly bill form"
+          >
+            ×
+          </button>
+        </div>
+        <input type="hidden" name="id" />
+        <label
+          >What’s the bill?<input
+            name="title"
+            maxlength="120"
+            required
+            placeholder="e.g. Internet"
+        /></label>
+        <div class="form-pair">
+          <label
+            >Usual amount in EUR<input
+              name="amount"
+              inputmode="decimal"
+              required
+              pattern="[0-9]+([.,][0-9]{1,2})?"
+              placeholder="e.g. 29.99"
+          /></label>
+          <label
+            >Day of the month<input
+              name="due_day"
+              type="number"
+              min="1"
+              max="31"
+              step="1"
+              required
+          /></label>
+        </div>
+        <p class="field-help">
+          For a shorter month, a day such as the 31st becomes the last day.
+        </p>
+        <div class="form-pair">
+          <label
+            >Who usually pays?<select name="paid_by" required></select
+          ></label>
+          <label
+            >Category<select name="category">
+              <option value="rent">Rent</option>
+              <option value="utilities">Utilities</option>
+              <option value="household">Household</option>
+              <option value="groceries">Groceries</option>
+              <option value="other">Other</option>
+            </select></label
+          >
+        </div>
+        <fieldset class="participant-fieldset">
+          <legend>Who shares this bill?</legend>
+          <div id="monthly-bill-participants" class="participant-list"></div>
+          <p class="field-help">
+            Equal shares. Any extra cent follows this saved order.
+          </p>
+        </fieldset>
+        <label class="check-label"
+          ><input name="active" type="checkbox" checked /> Keep this bill
+          active</label
+        >
+        <details class="more-details">
+          <summary>More details</summary>
+          <div class="details-content">
+            <label
+              >Notes<textarea name="notes" rows="2" maxlength="2000"></textarea>
+            </label>
+          </div>
+        </details>
+        <p id="monthly-bill-error" class="form-error" role="alert" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="quiet-button close-dialog">Cancel</button
+          ><button type="submit" class="primary-button">
+            Save monthly bill
           </button>
         </div>
       </form>

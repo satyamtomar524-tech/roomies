@@ -163,8 +163,14 @@ class Storage:
         return room
 
     def save_flat(self, data: dict) -> dict:
-        flat = validate_flat(data)
         with self._connect() as connection:
+            if isinstance(data, dict):
+                data = dict(data)
+                current = self._flat(connection)
+                # A tab opened before this upgrade does not know about these lists.
+                for field in ("repayments", "monthly_bills"):
+                    data.setdefault(field, current[field])
+            flat = validate_flat(data)
             connection.execute("UPDATE flat SET data=? WHERE id=1", (json.dumps(flat),))
         return flat
 
@@ -262,7 +268,7 @@ class Storage:
             plain = {key: value for key, value in product.items() if key not in dynamic}
             plain["observations"] = [{key: value for key, value in observation.items() if key not in ("id", "product_id")} for observation in reversed(product["observations"])]
             products.append(plain)
-        return {"schema_version": 2, "room": state["room"], "products": products, "flat": state["flat"]}
+        return {"schema_version": 3, "room": state["room"], "products": products, "flat": state["flat"]}
 
     def export_csv(self) -> str:
         output = io.StringIO(newline="")
@@ -287,14 +293,17 @@ class Storage:
         if not isinstance(payload, dict):
             raise ValidationError("The backup must be an object.")
         version = payload.get("schema_version", 1)
-        if isinstance(version, bool) or not isinstance(version, int) or version not in (1, 2):
+        if isinstance(version, bool) or not isinstance(version, int) or version not in (1, 2, 3):
             raise ValidationError("This export version is not supported.")
-        allowed_fields = {"schema_version", "room", "products"} | ({"flat"} if version == 2 else set())
+        allowed_fields = {"schema_version", "room", "products"} | ({"flat"} if version >= 2 else set())
         if set(payload) - allowed_fields:
             raise ValidationError("The backup contains unknown fields for its version.")
-        if version == 2 and "flat" not in payload:
-            raise ValidationError("A version 2 backup must include the flat.")
-        flat = validate_flat(payload["flat"]) if version == 2 else None
+        if version >= 2 and "flat" not in payload:
+            raise ValidationError(f"A version {version} backup must include the flat.")
+        if version == 3 and (not isinstance(payload["flat"], dict) or
+                             not {"repayments", "monthly_bills"} <= payload["flat"].keys()):
+            raise ValidationError("A version 3 backup must include repayments and monthly bills, even when empty.")
+        flat = validate_flat(payload["flat"]) if version >= 2 else None
         room = validate_room(payload.get("room"))
         entries = payload.get("products", [])
         if not isinstance(entries, list) or len(entries) > 100:
@@ -354,4 +363,19 @@ class Storage:
                     if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
                         row[key] = "'" + value
                 writer.writerow(row)
+        return output.getvalue()
+
+    def export_repayments_csv(self) -> str:
+        flat = self.state()["flat"]
+        names = {member["id"]: member["name"] for member in flat["members"]}
+        output = io.StringIO(newline="")
+        fields = ["id", "date", "from_id", "sender_name", "to_id", "recipient_name", "amount_cents", "notes"]
+        writer = csv.DictWriter(output, fieldnames=fields)
+        writer.writeheader()
+        for payment in flat["repayments"]:
+            row = dict(payment, sender_name=names[payment["from_id"]], recipient_name=names[payment["to_id"]])
+            for key, value in row.items():
+                if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+                    row[key] = "'" + value
+            writer.writerow(row)
         return output.getvalue()

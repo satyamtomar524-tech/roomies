@@ -10,7 +10,7 @@ Run `python -m roommate` from the project directory, or `start.ps1` on Windows. 
 - **My room:** the measured room plan. Start with the sample, then enter your actual walls, openings and furniture.
 - **My flat:** belongings and where to find them. Add a name, room, exact spot, quantity and owner.
 - **Kitchen:** kitchen equipment plus fridge, freezer and pantry supplies. Update stock status as things are used.
-- **Shared costs:** people, bills and balances.
+- **Shared costs:** people, bills, repayments and balances.
 - **Upgrades:** wishlist products and price history.
 
 The flat starts empty. Add your flatmates in flat settings before assigning belongings or splitting a bill.
@@ -37,7 +37,15 @@ Set stock to Stocked, Low or Out. Low and Out entries become the shopping checkl
 
 A positive balance means that person is owed money. A negative balance means they owe money. Values stay in exact cents. Remainder cents go to the first participants in saved order.
 
-Suggested payments describe the saved expense ledger. Roomies does not move money or record completed bank transfers. Edit or remove an incorrect expense; do not treat a suggestion as a payment receipt. Member removal is blocked if belongings, food or bills still reference that person.
+After paying someone back, choose **Record repayment** next to the suggestion. Check the people, amount and date, then confirm the payment has already been made. A partial repayment reduces what is owed. Paying back the full amount clears it. Repayments do not increase spending, and the app does not send money or verify a bank transfer.
+
+Use **Money paid back** to edit or remove a mistaken entry. Member removal is blocked while belongings, food, bills, repayments or monthly templates still refer to that person.
+
+## Keep rent and regular bills ready
+
+Open **Rent & regular bills** and save a monthly bill: the usual amount, who pays, who shares it and the due day. If you choose the 31st, a shorter month uses its last day.
+
+Nothing enters your spending yet. After the bill is paid, choose **Record paid bill**, check the date and actual amount, and save. One saved bill can have one recorded expense per calendar month. You can edit that expense if it is wrong. Updating the template affects future entries; older expenses keep their original amounts. Pause or remove a template when you no longer need it.
 
 ## Arrange the room
 
@@ -60,6 +68,8 @@ Unknown shipping stays blank. A live SKU match can support an informational item
 | Move a desk | `web/app.js` | `geometry.py` | Room in `storage.py` |
 | Store a kettle's location | `web/flat.js` | `household.py` | Flat in `storage.py` |
 | Split groceries | `web/flat.js` | `expenses.py` | Expense inside flat |
+| Record money paid back | `web/costs.js` | `expenses.py` | Repayment inside flat |
+| Reuse a monthly bill | `web/costs.js` | `expenses.py` | Template, then a reviewed expense |
 | Record a product quote | `web/app.js` | `pricing.py` | Separate observation |
 
 `server.py` receives the JSON requests. An API is this browser-to-Python interface. JSON is the structured text they exchange. SQLite is the database stored in one local file.
@@ -68,6 +78,6 @@ Start learning with one action. For example, trace how a €20.00 expense become
 
 ## Back up the workspace
 
-Use the data menu to export a full backup. Current backups include the flat and room. Older room-only backups preserve the existing flat when imported. Runtime databases and actual backups belong outside the public repository.
+Use the data menu to export a full backup. Current backups include the flat, repayments, monthly bills and room. Version 1 room-only backups preserve the existing flat. Version 2 backups restore the flat records they contain; if repayments and monthly bills are absent, those lists become empty. The import preview explains this before confirmation. Runtime databases and actual backups belong outside the public repository.
 
 See `VERIFICATION.md` for the checks and `PORTFOLIO.md` for a description you can explain in an interview.

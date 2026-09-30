@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const costsWorkflow = require('./costs-workflow.cjs');
 
 module.exports = async function flatWorkflow(page, getState, results) {
   const field = (form, name) => page.locator(`${form} [name="${name}"]`);
@@ -154,7 +155,7 @@ module.exports = async function flatWorkflow(page, getState, results) {
   const backupPath = path.join(results, 'flat-workspace.json');
   await backup.saveAs(backupPath);
   const exported = JSON.parse(await fs.readFile(backupPath, 'utf8'));
-  assert.equal(exported.schema_version, 2);
+  assert.equal(exported.schema_version, 3);
   assert.equal(exported.flat.inventory[0].spot, 'Upper cupboard');
   assert.equal(exported.flat.fridge[0].best_before, '2030-01-01');
   assert.equal(exported.flat.expenses.length, 2);
@@ -214,6 +215,7 @@ module.exports = async function flatWorkflow(page, getState, results) {
   current = await getState();
   assert.deepEqual(current.flat.expenses[0].split_between, [bob, alice]);
   assert.deepEqual(current.flat_summary.expenses, originalSummary);
+  await costsWorkflow(page, getState, results);
   await navigate('home');
   assert.match(await page.locator('#home-flat-name').innerText(), /Browser test flat/);
 };

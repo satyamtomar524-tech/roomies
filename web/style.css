@@ -1302,6 +1302,39 @@ textarea {
   gap: 15px;
   padding: 15px 0;
   border-top: 1px solid #dce6de;
+  flex-wrap: wrap;
+}
+.monthly-bills-panel {
+  margin-top: 23px;
+}
+.monthly-bills-panel > summary {
+  padding: 22px 24px;
+  font-size: 18px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.monthly-bills-panel .count-badge {
+  margin-left: 8px;
+}
+.monthly-bills-panel .household-row {
+  flex-wrap: wrap;
+}
+.monthly-bills-panel .household-row-actions {
+  flex-wrap: wrap;
+}
+.compact-export {
+  padding-top: 0;
+}
+#repayment-form .check-label,
+#monthly-bill-form .check-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#repayment-form .check-label input,
+#monthly-bill-form .check-label input {
+  width: auto;
+  margin: 0;
 }
 .settlement-row span {
   font-size: 15px;

@@ -6,11 +6,12 @@ from datetime import date
 import re
 from typing import Any
 
-from .expenses import summarize_expenses, validate_expense
+from .expenses import (monthly_bill_status, summarize_expenses, validate_expense,
+                       validate_monthly_bill, validate_repayment)
 from .geometry import ValidationError
 
 
-FLAT_FIELDS = {"name", "is_demo", "members", "inventory", "fridge", "expenses"}
+FLAT_FIELDS = {"name", "is_demo", "members", "inventory", "fridge", "expenses", "repayments", "monthly_bills"}
 INVENTORY_FIELDS = {"id", "name", "category", "location", "spot", "owner_id", "quantity", "notes"}
 FRIDGE_FIELDS = {"id", "name", "quantity", "storage", "owner_id", "status", "best_before", "notes"}
 
@@ -71,7 +72,8 @@ def _best_before(value: Any) -> str | None:
 
 def default_flat() -> dict:
     """An empty starter, with no invented possessions, groceries or debts."""
-    return {"name": "My flat", "is_demo": True, "members": [{"id": "me", "name": "Me"}], "inventory": [], "fridge": [], "expenses": []}
+    return {"name": "My flat", "is_demo": True, "members": [{"id": "me", "name": "Me"}],
+            "inventory": [], "fridge": [], "expenses": [], "repayments": [], "monthly_bills": []}
 
 
 def validate_flat(data: Any) -> dict:
@@ -83,6 +85,7 @@ def validate_flat(data: Any) -> dict:
     result = {
         "name": _text(data.get("name", "My flat"), "Flat name", 120, True),
         "is_demo": is_demo, "members": [], "inventory": [], "fridge": [], "expenses": [],
+        "repayments": [], "monthly_bills": [],
     }
     members = _list(data.get("members", []), "Members", 20)
     if not members:
@@ -121,13 +124,17 @@ def validate_flat(data: Any) -> dict:
                             best_before=_best_before(entry.get("best_before")))
             result[field].append(item)
 
-    seen = set()
-    for entry in _list(data.get("expenses", []), "Expenses", 500):
-        expense = validate_expense(entry, result["members"])
-        if expense["id"] in seen:
-            raise ValidationError("Expense IDs must be unique.")
-        seen.add(expense["id"])
-        result["expenses"].append(expense)
+    for field, validator, limit in (("expenses", validate_expense, 500),
+                                    ("repayments", validate_repayment, 500),
+                                    ("monthly_bills", validate_monthly_bill, 100)):
+        seen = set()
+        for entry in _list(data.get(field, []), field.replace("_", " ").capitalize(), limit):
+            record = validator(entry, result["members"])
+            if record["id"] in seen:
+                raise ValidationError(f"{field.replace('_', ' ').capitalize()} IDs must be unique.")
+            seen.add(record["id"])
+            result[field].append(record)
+    summarize_expenses(result["expenses"], result["members"], result["repayments"])
     return result
 
 
@@ -141,5 +148,6 @@ def summarize_flat(flat: dict) -> dict:
         "locations": locations,
         "fridge_count": len(flat["fridge"]),
         "fridge_counts": {status: sum(item["status"] == status for item in flat["fridge"]) for status in ("stocked", "low", "out")},
-        "expenses": summarize_expenses(flat["expenses"], flat["members"]),
+        "expenses": summarize_expenses(flat["expenses"], flat["members"], flat["repayments"]),
+        "monthly_bills": monthly_bill_status(flat["monthly_bills"], flat["expenses"]),
     }

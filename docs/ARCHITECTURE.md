@@ -4,9 +4,11 @@ Roomies is one local application with a room plan and a separate flat base. The 
 
 ```mermaid
 flowchart LR
-    A[Browser: room and wishlist] -->|JSON requests| B[Local Python server]
+    A[Browser: room, flat and shared costs] -->|JSON requests| B[Local Python server]
     B --> C[Geometry rules]
     B --> D[Product and price rules]
+    B --> H[Household and expense rules]
+    H --> E
     B --> E[SQLite storage]
     B --> F[Scheduled price checks]
     F -->|Public HTTPS when enabled| G[Product page JSON-LD]
@@ -21,7 +23,7 @@ flowchart LR
 |---|---|
 | `roommate/geometry.py` | Room validation, rectangular footprints, overlap and boundary checks, room-area accounting, candidate positions |
 | `roommate/household.py` | Flat members, belongings, kitchen stock, ownership references and summary validation |
-| `roommate/expenses.py` | Exact-cent expense validation, participant shares, balances and suggested settlements |
+| `roommate/expenses.py` | Exact-cent bills and repayments, monthly templates, participant shares and balances |
 | `roommate/pricing.py` | Product/observation validation, fit and target evaluation, structured-offer parsing, restricted public HTTP fetching |
 | `roommate/storage.py` | SQLite schema, transactions, room and product records, price history, deduplicated notifications, import/export |
 | `roommate/server.py` | HTTP routes, request limits, localhost access checks, static files, scheduled checks |
@@ -29,6 +31,7 @@ flowchart LR
 | `web/index.html` | Accessible controls and page structure |
 | `web/app.js` | Selection, drawing, dragging, editing, API requests, journal rendering, export/import controls |
 | `web/flat.js` | Home, flat inventory, kitchen lists, member settings and shared-cost controls |
+| `web/costs.js` | Repayment forms, monthly bill templates and reviewed bill entry |
 | `web/style.css` | Responsive application layout and appearance |
 | `web/guide.html` | Short guide inside the app |
 | `tests/` | Behavioral checks and regressions |
@@ -49,10 +52,19 @@ Adding a pan does not change room geometry. A flat record and a measured room it
 1. The browser converts the entered EUR amount to integer cents and sends it with the payer and participant IDs.
 2. Validation rejects missing members, duplicate participants and malformed amounts.
 3. `expenses.py` divides cents evenly, giving remainder cents to the first participants in saved order.
-4. Each balance equals money paid minus allocated shares. The sum of balances is zero.
+4. Each balance equals bills paid minus allocated shares, plus repayments sent and minus repayments received. The sum of balances is zero.
 5. The module matches debtors to creditors to suggest reconciling payments. This is a deterministic greedy calculation, not proof of a globally minimal set of transfers.
 
-The suggestions do not move money or record actual bank payments. Member IDs, rather than names, keep references stable when names change.
+Suggestions do not move money. A separate repayment record stores a transfer the user says has already happened; it is not bank verification. Member IDs keep references stable when names change.
+
+### Reuse a monthly bill
+
+1. Save the usual amount, payer, participants and due day in `monthly_bills`.
+2. The summary calculates this month's due date, using the month's last day when necessary.
+3. The user opens a draft and checks its amount and payment date before saving it as an expense.
+4. The expense keeps `bill_id` and `bill_month`. Validation rejects a duplicate pair and requires the month to match its date.
+
+Templates never create expenses on a timer. Editing or deleting a template leaves recorded expenses intact. The `bill_id` on an old expense is provenance, so it remains valid after its template is removed.
 
 ### Move an item
 
@@ -90,14 +102,14 @@ This version has no user-account system or cloud deployment. Local monitoring is
 ## Database structure
 
 - `room`: the current room as normalized JSON, one row.
-- `flat`: members, belongings, kitchen stock and expenses as validated JSON, one row, saved separately from the room.
+- `flat`: members, belongings, kitchen stock, expenses, repayments and monthly templates as validated JSON, one row, saved separately from the room.
 - `products`: stable product identity, source link, dimensions, target, and monitoring settings.
 - `observations`: dated quotes linked to a product, with price, shipping, stock, variant evidence, and source.
 - `notifications`: typed item-price or target updates, their source observation, time, and read state.
 
 Foreign keys keep observations attached to valid products. Parameterized SQL avoids turning a product name or note into executable SQL. Imports validate the complete incoming workspace before replacing data in a transaction.
 
-Schema 2 backups include the flat. Schema 1 room-only backups preserve the current flat. Resetting the sample room also preserves flat records. Opening an existing database adds an empty flat without discarding its room or price history.
+Schema 3 backups include all flat lists. Schema 1 room-only backups preserve the current flat. Schema 2 restores the flat data it contains, with empty newer lists when absent; the browser explains this before import. Resetting the sample room preserves flat records. Opening an older database supplies empty new lists without discarding saved data. A write from an older open tab preserves repayments and monthly templates when it omits those fields.
 
 ## A small SQL exercise
 

@@ -1,11 +1,11 @@
 {
   "name": "roomies-browser-checks",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Optional browser checks for the local Roomies application.",
   "scripts": {
     "test:browser": "node tests/browser-smoke.cjs",
-    "check": "node --check web/app.js && node --check web/flat.js"
+    "check": "node --check web/app.js && node --check web/flat.js && node --check web/costs.js"
   },
   "devDependencies": {
     "playwright": "1.62.1"

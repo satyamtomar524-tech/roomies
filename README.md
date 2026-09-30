@@ -1,14 +1,29 @@
 # Roomies
 
-**Your room, your flat, and the things you share.**
+**My room. My things. Our flat.**
 
-I wanted one place to plan my room, find the things I own, keep track of kitchen supplies, and split flat expenses. Roomies brings these everyday tasks together, with a simple home screen and a separate page for each job.
+I wanted to know how my room could look before buying more things. Would a bed fit? Where could I keep a table? Could I leave a space for a lamp that I don't have yet?
+
+Then the idea got bigger. I also wanted to remember where I kept my things, check what was in the kitchen, and work out shared bills with flatmates. That is what Roomies brings together.
 
 ![Roomies home screen](docs/screenshots/home-desktop.png)
 
-## Start here
+## What it does
 
-Requires Python 3.10 or newer. The application uses Python's standard library. It needs no API key, paid service or database server.
+| Page | What you can do |
+|---|---|
+| Home | See what's useful next and open the right page |
+| My room | Move measured furniture, reserve space for future items and try wall and floor colours |
+| My flat | Save what you own, who owns it, and exactly where it is kept |
+| Kitchen | Keep a fridge, freezer and pantry checklist; see what is running low |
+| Shared costs | Split bills, record money paid back and save monthly bill details |
+| Upgrades | Save products, compare their size with your plan and keep dated price records |
+
+The room starts with a clearly labelled **3 × 3.5 m sample**. It is there to try the planner. Replace it with your measurements when you are ready. The flat starts empty, with one placeholder person called Me.
+
+## Run it
+
+You need Python 3.10 or newer. The app itself uses Python's standard library, so there is no API key or database server to set up.
 
 ```sh
 git clone https://github.com/satyamtomar524-tech/roomies.git
@@ -16,71 +31,45 @@ cd roomies
 python -m roommate
 ```
 
-The Python module remains `roommate` so existing working copies and databases keep working. The installed package also provides a `roomies` command. On Windows, run `py -m roommate` or:
+On Windows, you can run `py -m roommate` or `./start.ps1`. Open the local address printed in the terminal. Keep that terminal running while using the app; Ctrl+C stops it.
 
-```powershell
-.\start.ps1
-```
+The module is still called `roommate` so older working copies keep working. Installing the package with `pip install .` also gives you the `roomies` command. Use `python -m roommate --no-tracker` if you only want planning and manual records.
 
-Open the local address printed in the terminal. Leave the terminal open while using Roomies; Ctrl+C stops it. For planning and manual records without scheduled price checks, use `python -m roommate --no-tracker`.
+## A small example
 
-## One page for each job
+Save a kettle as **Kitchen → Worktop beside the sink → Shared**. Mark milk as **Low** and it appears on the shopping list.
 
-| Page | What I use it for |
-|---|---|
-| Home | See the next useful action and open the right part of the app |
-| My room | Arrange measured furniture, reserve future spaces, preview colours and check conflicts |
-| My flat | List belongings, their owner, room and exact storage spot; search for an item |
-| Kitchen | Find kitchen equipment and check fridge, freezer and pantry supplies |
-| Shared costs | Record who paid, select who shares the bill and see balances |
-| Upgrades | Keep a wishlist and dated price observations linked to reserved room spaces |
+For a shared bill, say one person pays €30 for groceries for two people. Each person's share is €15. When the other person pays back €15, record that repayment: both balances become zero, and total spending stays €30.
 
-The room starts as a clearly labeled **3 × 3.5 m sample**. The flat starts empty with a placeholder member named Me. No possessions, groceries, purchases or debts are invented.
+For rent or internet, save a monthly bill once. When it is paid, open the saved details, check the amount and date, and record it. The app stops the same saved bill being recorded twice for the same month. Templates never create charges on their own.
 
-## The useful details
+## How I built it
 
-A belonging can be saved as “Kettle → Kitchen → Worktop beside the sink,” with an owner or Shared. These records do not need furniture dimensions. A measured bed on the room plan and a belonging in the flat list are separate records.
+Python handles the rules and local HTTP API. SQLite stores the records. Plain JavaScript handles the forms, and SVG draws the room. Shared amounts are stored as whole cents so rounding cannot lose money.
 
-The kitchen list records what is stocked, running low or missing. Low and missing items form a shopping checklist. Optional best-before dates help decide what to check next; they are the user's records, not food-safety assessments.
+The idea and requirements are mine. I used coding assistance to build and review the implementation. I have kept the code, tests and guide together so I can understand the decisions and learn from the project.
 
-Expenses use integer cents. A €20.00 bill split three ways becomes €6.67, €6.67 and €6.66 in the saved participant order. Balances and suggested payments reconcile every cent. Suggestions do not send money or track bank transfers.
-
-Room planning keeps the existing boundary, overlap, surface-parent and clearance checks. Advanced settings are available when needed. A lamp can belong to a desk surface; a rug can overlap furniture.
-
-## Price tracking
-
-Live checks read public [Product](https://schema.org/Product) and [Offer](https://schema.org/Offer) JSON-LD on compatible pages. They require an unambiguous current EUR offer and permitted crawling. Unsupported pages fail visibly and can be recorded manually.
-
-Automatic variant confidence requires a confirmed saved variant, matching retailer SKU and matching product link. The adapter leaves shipping unknown. An item-price drop is labeled separately from a confirmed delivered-price target alert.
-
-Checks run only while the local server is open. No real retailer has been demonstrated as compatible in this build. The app does not claim market-wide search, actual savings, automatic checkout or cloud notifications.
-
-## Understand the project
-
-Start with [Project guide](docs/PROJECT_GUIDE.md), then follow one action through [Architecture](docs/ARCHITECTURE.md). [Data and rules](docs/DATA_AND_RULES.md) explains fit, dates and money. [Verification](docs/VERIFICATION.md) records the checks. [Portfolio notes](docs/PORTFOLIO.md) gives a factual CV and interview description.
-
-An abbreviated guide is also available inside the app.
+Start with the [project guide](docs/PROJECT_GUIDE.md). The [architecture](docs/ARCHITECTURE.md) shows where each action goes in the code. [Verification](docs/VERIFICATION.md) records the checks, and [portfolio notes](docs/PORTFOLIO.md) give an accurate project description.
 
 ```sh
 python -m unittest discover -s tests -v
 node --check web/app.js
 node --check web/flat.js
+node --check web/costs.js
 ```
 
-Optional browser checks and the [GitHub workflow runs](https://github.com/satyamtomar524-tech/roomies/actions) cover the full workflow.
+Browser checks are optional development tools. Their setup is in the verification guide. [GitHub Actions](https://github.com/satyamtomar524-tech/roomies/actions) runs the tests for each update.
 
-## Data and scope
+## What this version covers
 
-Roomies is a local, single-user workspace. Member names are bookkeeping labels, not accounts or invitations. Roommates do not have live access from their own phones. Runtime databases are excluded from Git. Backups can contain room measurements, belongings and expense records; keep actual flat backups private.
+- It runs locally on one computer. Flatmate names are labels, so there are no shared logins or live phone-to-phone updates. Repayments are records of payments you made yourself.
+- The room is a rough rectangular plan with dimension and clearance checks. Colours are schematic; it is not a construction drawing or a 3D rendering.
+- Live price checks work only with compatible public product pages that permit crawling. No real retailer has been demonstrated as compatible yet. Manual price records work independently. Blank shipping stays unknown, and checks run only while the server is open.
 
-Current backups include the room, products, history and flat. Older room-only backups leave the flat unchanged. Importing a current backup replaces those saved records after confirmation. Imports do not replay old price alerts.
-
-The floor plan uses rectangular footprints and modeled clearance zones, not a detailed survey or photorealistic 3D view. Suggestions are heuristic options. Colours are schematic previews. The budget is a recorded preference, not an affordability assessment.
-
-I used coding assistance to implement this project. The idea and requirements came from me. The code, tests and guide stay together so I can inspect the choices and learn the implementation.
+Use the data menu for a complete backup. It includes bills, repayments and monthly templates as well as the room and flat. Keep your actual backups private; runtime databases are excluded from Git. [Data and rules](docs/DATA_AND_RULES.md) explains older backup formats and price evidence.
 
 ## References
 
-[EricAndrechek/Room-Planner](https://github.com/EricAndrechek/Room-Planner) and [sonoyumi/price-tracker](https://github.com/sonoyumi/price-tracker) were reviewed as feature references for the original room-and-price workflow. No source code from those repositories was copied.
+[Room-Planner](https://github.com/EricAndrechek/Room-Planner) and [price-tracker](https://github.com/sonoyumi/price-tracker) were reviewed as feature references for the original room and price idea. Their source code was not copied.
 
 MIT license · Satyam Tomar

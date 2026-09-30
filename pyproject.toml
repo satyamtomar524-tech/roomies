@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "roomies-student-flat"
-version = "2.0.0"
+version = "2.1.0"
 description = "A local student flat companion for room planning, belongings, kitchen lists and shared costs."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,4 +20,4 @@ roommate = "roommate.server:main"
 packages = ["roommate"]
 
 [tool.setuptools.data-files]
-"share/roommate/web" = ["web/index.html", "web/style.css", "web/app.js", "web/flat.js", "web/guide.html", "web/guide.css"]
+"share/roommate/web" = ["web/index.html", "web/style.css", "web/app.js", "web/flat.js", "web/costs.js", "web/guide.html", "web/guide.css"]

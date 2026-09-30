@@ -25,7 +25,8 @@ if not WEB_ROOT.exists():
 
 STATIC_FILES = {
     "/": "index.html", "/index.html": "index.html", "/guide": "guide.html",
-    "/guide.html": "guide.html", "/style.css": "style.css", "/guide.css": "guide.css", "/app.js": "app.js", "/flat.js": "flat.js",
+    "/guide.html": "guide.html", "/style.css": "style.css", "/guide.css": "guide.css",
+    "/app.js": "app.js", "/flat.js": "flat.js", "/costs.js": "costs.js",
 }
 MAX_BODY_BYTES = 2 * 1024 * 1024
 
@@ -65,7 +66,7 @@ class RoomMateServer(ThreadingHTTPServer):
 
 class RequestHandler(BaseHTTPRequestHandler):
     server: RoomMateServer
-    server_version = "Roomies/2.0"
+    server_version = "Roomies/2.1"
 
     def log_message(self, format, *args):
         # Keep request bodies, room details and shopping URLs out of logs.
@@ -195,10 +196,12 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self._reply(200, storage.export_csv().encode("utf-8-sig"), "text/csv; charset=utf-8", "roomies-price-history.csv")
             elif format == "expenses":
                 self._reply(200, storage.export_expenses_csv().encode("utf-8-sig"), "text/csv; charset=utf-8", "roomies-expense-shares.csv")
+            elif format == "repayments":
+                self._reply(200, storage.export_repayments_csv().encode("utf-8-sig"), "text/csv; charset=utf-8", "roomies-repayments.csv")
             elif format == "json":
                 self._reply(200, json.dumps(storage.export(), indent=2, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8", "roomies-backup.json")
             else:
-                raise ValueError("Export format must be json, csv or expenses.")
+                raise ValueError("Export format must be json, csv, expenses or repayments.")
         elif method == "PUT" and path == "/api/room":
             room = storage.save_room(self._body())
             self._json(200, {"room": room, "summary": analyse_room(room)})

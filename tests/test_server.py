@@ -22,6 +22,7 @@ class ServerTests(unittest.TestCase):
         (self.web / "guide.html").write_text("<h1>A useful guide</h1>", encoding="utf-8")
         (self.web / "guide.css").write_text("body{}", encoding="utf-8")
         (self.web / "flat.js").write_text("console.log('flat');", encoding="utf-8")
+        (self.web / "costs.js").write_text("console.log('costs');", encoding="utf-8")
         self.server = RoomMateServer(("127.0.0.1", 0), self.storage, self.web)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -53,9 +54,28 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.request("GET", "/guide")[0], 200)
         self.assertEqual(self.request("GET", "/guide.css")[0], 200)
         self.assertEqual(self.request("GET", "/flat.js")[0], 200)
+        self.assertEqual(self.request("GET", "/costs.js")[0], 200)
         self.assertEqual(self.request("GET", "/../roommate/storage.py")[0], 404)
         self.assertEqual(self.request("GET", "/%2e%2e/roommate/storage.py")[0], 404)
         self.assertEqual(self.request("GET", "/data/room.sqlite3")[0], 404)
+
+    def test_repayment_export_and_duplicate_monthly_bill_rejection(self):
+        flat = household_data()
+        flat["repayments"] = [{"id": "repay", "from_id": "amy", "to_id": "me", "amount_cents": 500,
+                               "date": "2026-09-30", "notes": "Test transfer"}]
+        status, _, content = self.request("PUT", "/api/flat", flat)
+        self.assertEqual(status, 200)
+        saved = json.loads(content)
+        self.assertEqual(saved["flat_summary"]["expenses"]["settlements"], [])
+        status, headers, content = self.request("GET", "/api/export?format=repayments")
+        self.assertEqual(status, 200)
+        self.assertIn("roomies-repayments.csv", headers["Content-Disposition"])
+        self.assertIn("sender_name", content.decode("utf-8-sig"))
+        self.assertIn("Test transfer", content.decode("utf-8-sig"))
+        flat["expenses"][0].update(bill_id="internet", bill_month="2026-09")
+        flat["expenses"].append(dict(flat["expenses"][0], id="again"))
+        self.assertEqual(self.request("PUT", "/api/flat", flat)[0], 400)
+        self.assertEqual(self.storage.state()["flat"], saved["flat"])
 
     def test_cross_origin_read_and_write_are_blocked_before_mutation(self):
         before = self.storage.export()
@@ -135,7 +155,7 @@ class ServerTests(unittest.TestCase):
         self.assertIn("share_cents", content.decode("utf-8-sig"))
         status, headers, content = self.request("GET", "/api/export?format=json")
         result = json.loads(content)
-        self.assertEqual(result["schema_version"], 2)
+        self.assertEqual(result["schema_version"], 3)
         self.assertEqual(result["flat"]["expenses"][0]["amount_cents"], 1001)
         self.assertIn("roomies-backup.json", headers["Content-Disposition"])
 

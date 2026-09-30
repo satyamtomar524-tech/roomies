@@ -1,8 +1,16 @@
 # Build journal
 
+## 30 September 2026 — Finishing the everyday flow
+
+I wanted the shared-cost page to finish the job: add a bill, see who owes what, then record the money paid back. Repayments now change the balance without counting as more spending.
+
+Rent and regular bills can be saved as monthly templates. They need a reviewed entry after payment. A template creates no debt on its own, and the same bill cannot be recorded twice for one month.
+
+I also shortened the main copy around the original idea: my room, my things, and our flat. The guide explains the full flow, including backups, mistakes and corrections. This release finishes the local app; cloud accounts and syncing are outside its scope.
+
 ## 30 September 2026 — Roomies
 
-The flat base grew from the user's request to list shared belongings, show where things are kept, organize kitchen and fridge supplies, and split shared expenses. The interface now starts with a simpler home screen and one page per task.
+I expanded the room idea to include flat belongings, where things are kept, kitchen supplies and shared expenses. The interface starts with a simple home screen and one page per task.
 
 ### Decisions
 

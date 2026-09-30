@@ -69,11 +69,11 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(state["flat"], saved_flat)
         self.assertEqual(self.storage.reset()["flat"], saved_flat)
 
-    def test_version_two_round_trip_keeps_flat_and_exact_cents(self):
+    def test_current_version_round_trip_keeps_flat_and_exact_cents(self):
         self.storage.save_product(product_data())
         self.storage.save_flat(household_data())
         before = self.storage.export()
-        self.assertEqual(before["schema_version"], 2)
+        self.assertEqual(before["schema_version"], 3)
         self.storage.save_flat({"members": [{"id": "me", "name": "Me"}]})
         self.storage.import_data(before)
         self.assertEqual(self.storage.export(), before)
@@ -93,7 +93,7 @@ class StorageTests(unittest.TestCase):
         fractional_cents = copy.deepcopy(before)
         fractional_cents["flat"]["expenses"][0]["amount_cents"] = 1001.0
         invalid.append(fractional_cents)
-        for version in (True, 1.0, 3, "2"):
+        for version in (True, 1.0, 4, "2"):
             bad_version = copy.deepcopy(before)
             bad_version["schema_version"] = version
             invalid.append(bad_version)

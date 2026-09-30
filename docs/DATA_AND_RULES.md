@@ -93,15 +93,19 @@ Removing a referenced member is rejected. Existing records must first be reassig
 
 Amounts are stored as positive integer cents in EUR. Equal shares use integer division. Remaining cents are assigned to the first participants in saved order. For example, 2,000 cents shared by three people yields 667, 667 and 666 cents.
 
-Balance = cents paid − allocated share. Positive means owed money; negative means owing money. Balances must sum to zero. Suggested payments match debtors to creditors deterministically and reconcile the recorded balances; the method is not claimed to find the fewest possible transfers.
+Balance = bills paid − allocated share + repayments sent − repayments received. Positive means owed money; negative means owing money. Balances must sum to zero. Suggested payments match debtors to creditors deterministically and reconcile the recorded balances; the method is not claimed to find the fewest possible transfers.
 
-A payer may pay for other participants without taking a share. Expense edits change the current ledger; entries are not immutable accounting receipts. The app does not make payments, connect to banks, record completed settlements, or evaluate affordability.
+A payer may pay for other participants without taking a share. Expense edits change the current ledger; entries are not immutable accounting receipts. A repayment records money the user says has already been sent between two different members. It adjusts balances without adding to spending. Overpayments are allowed and can reverse who owes whom. The app does not send money, connect to banks or verify transfers.
+
+Monthly templates store the usual amount, payer, participant order and due day. A due day beyond the end of a month uses its last day. Templates are limited to 100 and repayments to 500 records. Neither an active template nor its due date creates an expense automatically. The user reviews a draft before recording a paid bill. An expense's optional `bill_id` and `bill_month` appear together; its month must match its payment date. Duplicate bill/month pairs are rejected. Deleting a template preserves expenses already recorded from it.
 
 ## Backups
 
-Schema 2 exports contain the room, products, observations and flat. Import validation completes before replacement, so rejected data cannot erase the existing workspace. Schema 1 room-only imports leave the current flat unchanged. Resetting the sample room preserves the flat. Imports do not replay historical price notifications.
+Schema 3 exports contain the room, products, observations and complete flat, including repayments and monthly templates. Import validation completes before replacement, so rejected data cannot erase the existing workspace. Schema 1 room-only imports leave the current flat unchanged. Schema 2 imports restore the flat records present in that backup; missing repayments and monthly bills become empty lists. The import preview warns about this before confirmation. Resetting the sample room preserves the flat. Imports do not replay historical price notifications.
 
 Expense CSV has one row per participant share. The expense's total repeats on each row: do not sum that total column across participant rows. Sum `share_cents` for allocated amounts, or count each expense ID once for expense totals.
+
+Repayment CSV has one row per repayment, with sender, recipient, date, amount in cents and notes. Keep it separate from spending totals. Both CSV exports neutralize text that spreadsheet tools could read as formulas.
 
 ## What is not claimed
 

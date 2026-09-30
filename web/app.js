@@ -2539,8 +2539,8 @@ async function readImport(event) {
       );
     importCandidate = data;
     const flatCopy =
-      data.schema_version === 2 && data.flat
-        ? ` Its flat contains ${data.flat.members?.length || 0} people, ${data.flat.inventory?.length || 0} belongings and ${data.flat.expenses?.length || 0} shared costs. The room, price journal and flat will be replaced.`
+      data.schema_version >= 2 && data.flat
+        ? ` Its flat contains ${data.flat.members?.length || 0} people, ${data.flat.inventory?.length || 0} belongings, ${data.flat.expenses?.length || 0} shared costs and ${data.flat.repayments?.length || 0} repayments. The room, price journal and flat will be replaced.${data.schema_version === 2 && (!data.flat.repayments || !data.flat.monthly_bills) ? " This older backup has no repayments or monthly bills; those lists will be cleared." : ""}`
         : " This is a room-only backup: the room and price journal will be replaced; your current flat, kitchen and shared costs stay unchanged.";
     $("#import-description").textContent =
       `This file contains “${data.room.name || "a room"}”, ${data.room.items.length} room items and ${data.products.length} products.${flatCopy}`;
@@ -2781,6 +2781,7 @@ function setWorkspaceAvailable(available) {
     "add-fridge-item",
     "add-expense",
     "export-expenses",
+    "add-monthly-bill",
   ];
   controls.forEach((identity) => {
     const control = document.getElementById(identity);

@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "room": {
     "id": "sample-room",
     "name": "A small room, a fresh start",
@@ -10,7 +10,7 @@
     "style": "Warm and simple",
     "wall_color": "#a4b497",
     "floor_color": "#f4f6ed",
-    "notes": "Sample room: 10.5 m\u00b2. These are made-up measurements, not a map of your actual room.",
+    "notes": "Sample room: 10.5 m². These are made-up measurements, not a map of your actual room.",
     "is_demo": true,
     "openings": [
       {
@@ -123,6 +123,8 @@
     ],
     "inventory": [],
     "fridge": [],
-    "expenses": []
+    "expenses": [],
+    "repayments": [],
+    "monthly_bills": []
   }
 }
