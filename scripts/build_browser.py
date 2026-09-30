@@ -22,6 +22,34 @@ INTEGRITY = "0YvXxEhfEdpLfb/XkM2BFAeMROq0iMUX2bzzH9pOttyMcWkwq+HbE5uyuGD82LN7y2q
 RUNTIME_FILES = ("pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "pyodide-lock.json", "python_stdlib.zip", "pyodide.mjs.map")
 PYTHON_FILES = ("__init__.py", "browser.py", "expenses.py", "geometry.py", "household.py", "pricing.py", "storage.py")
 WEB_FILES = ("index.html", "guide.html", "guide.css", "style.css", "app.js", "flat.js", "costs.js", "browser.js", "browser-worker.mjs", "browser.css")
+OUTPUT_FILES = frozenset(WEB_FILES) | {"roomies-python.zip"} | {
+    f"vendor/pyodide/{name}"
+    for name in (*RUNTIME_FILES, "PYODIDE-LICENSE", "PYTHON-LICENSE", "NOTICE.txt")
+}
+OUTPUT_DIRECTORIES = {"vendor", "vendor/pyodide"}
+
+
+def validate_output(output):
+    """Reject existing private files and filesystem links without deleting them."""
+    if output.is_symlink() or getattr(output, "is_junction", lambda: False)():
+        raise ValueError("The build output must be a dedicated directory, not a filesystem link.")
+    if not output.exists():
+        return
+    if not output.is_dir():
+        raise ValueError("The build output must be a directory.")
+    pending = [output]
+    while pending:
+        for entry in sorted(pending.pop().iterdir()):
+            relative = entry.relative_to(output).as_posix()
+            if entry.is_symlink() or getattr(entry, "is_junction", lambda: False)():
+                raise ValueError(f"Build output contains a filesystem link: {relative}. Use a fresh output directory.")
+            if entry.is_dir() and relative in OUTPUT_DIRECTORIES:
+                pending.append(entry)
+            elif not entry.is_file() or relative not in OUTPUT_FILES:
+                raise ValueError(
+                    f"Build output contains an unallowlisted entry: {relative}. "
+                    "Use a fresh output directory; existing files have not been removed."
+                )
 
 
 def download_runtime(cache):
@@ -36,15 +64,18 @@ def download_runtime(cache):
 
 
 def build(output, cache):
+    validate_output(output)
     output = output.resolve()
     if output == ROOT or output in ROOT.parents or output == ROOT / "web":
         raise ValueError("Build into a dedicated output directory.")
+    # Validate the runtime before overwriting a previous clean build.
+    raw_runtime = download_runtime(cache)
     output.mkdir(parents=True, exist_ok=True)
     for name in WEB_FILES:
         shutil.copyfile(ROOT / "web" / name, output / name)
     runtime = output / "vendor" / "pyodide"
     runtime.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(fileobj=io.BytesIO(download_runtime(cache)), mode="r:gz") as package:
+    with tarfile.open(fileobj=io.BytesIO(raw_runtime), mode="r:gz") as package:
         for name in RUNTIME_FILES:
             member = package.extractfile(f"package/{name}")
             (runtime / name).write_bytes(member.read())

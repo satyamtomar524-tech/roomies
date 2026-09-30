@@ -6,7 +6,7 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from roommate.server import RoomMateServer
+from roommate.server import MAX_BODY_BYTES, RoomMateServer
 from roommate.storage import Storage
 from tests.test_household import household_data
 
@@ -107,6 +107,45 @@ class ServerTests(unittest.TestCase):
         status, _, body = self.request("POST", "/api/reset", {}, {"Content-Length": str(3 * 1024 * 1024)})
         self.assertEqual(status, 400)
         self.assertIn("2 MiB", json.loads(body)["error"])
+
+    def test_large_own_json_export_restores_through_import_endpoint(self):
+        flat = household_data()
+        flat["inventory"] = [
+            {"id": f"item-{index}", "name": f"Item {index}", "notes": "漢" * 1000,
+             "location": "Room", "quantity": 1, "category": "other", "owner_id": None}
+            for index in range(500)
+        ]
+        flat["expenses"] = [
+            {"id": f"expense-{index}", "title": f"Expense {index}", "amount_cents": 100,
+             "paid_by": "me", "split_between": ["me", "amy"], "date": "2026-09-30",
+             "category": "other", "notes": "x" * 2000}
+            for index in range(500)
+        ]
+        self.storage.save_flat(flat)
+        status, _, exported = self.request("GET", "/api/export")
+        self.assertEqual(status, 200)
+        self.assertGreater(len(exported), MAX_BODY_BYTES)
+        payload = json.loads(exported)
+        self.storage.save_flat({"members": [{"id": "me", "name": "Me"}]})
+        status, _, content = self.request("POST", "/api/import", payload)
+        self.assertEqual(status, 200, content.decode())
+        self.assertEqual(self.storage.export(), payload)
+
+    def test_import_limit_is_bounded_independently_of_normal_writes(self):
+        declared = str(33 * 1024 * 1024)
+        status, _, body = self.request("POST", "/api/import", {}, {"Content-Length": declared})
+        self.assertEqual(status, 400)
+        self.assertIn("32 MiB", json.loads(body)["error"])
+
+    def test_product_endpoint_rejects_new_explicit_ids_at_capacity(self):
+        backup = self.storage.export()
+        backup["products"] = [{"id": f"product-{index}", "name": f"Product {index}"} for index in range(100)]
+        self.storage.import_data(backup)
+        status, _, content = self.request("POST", "/api/products", {"id": "bypass", "name": "An extra product"})
+        self.assertEqual(status, 400)
+        self.assertIn("at most 100 products", json.loads(content)["error"])
+        self.assertEqual(self.request("POST", "/api/products", {"id": "product-0", "name": "An existing product edit"})[0], 201)
+        self.assertEqual(len(self.storage.state()["products"]), 100)
 
     def test_geometric_errors_are_saved_and_reported(self):
         room = self.storage.state()["room"]

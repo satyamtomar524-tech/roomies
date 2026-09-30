@@ -18,6 +18,25 @@ from .expenses import expense_shares
 from .pricing import evaluate_product, product_signature, validate_observation, validate_product
 
 
+MAX_BACKUP_BYTES = 32 * 1024 * 1024
+MAX_PRODUCTS = 100
+
+
+def validate_backup_size(payload: dict) -> None:
+    """Use the exported UTF-8 format for one shared import/export ceiling."""
+    size = 0
+    # Stop at the ceiling without creating an extra full-sized JSON string.
+    encoder = json.JSONEncoder(indent=2, ensure_ascii=False, allow_nan=False)
+    for chunk in encoder.iterencode(payload):
+        size += len(chunk.encode("utf-8"))
+        if size > MAX_BACKUP_BYTES:
+            limit_mib = MAX_BACKUP_BYTES // (1024 * 1024)
+            raise ValidationError(
+                f"This JSON backup exceeds the {limit_mib} MiB supported limit. "
+                "Your saved data is unchanged; no records have been removed."
+            )
+
+
 def timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -176,6 +195,9 @@ class Storage:
 
     def save_product(self, data: dict) -> dict:
         with self._connect() as connection:
+            # Hold the write reservation while checking capacity, including IDs
+            # supplied by callers, so concurrent requests cannot take one slot.
+            connection.execute("BEGIN IMMEDIATE")
             room = self._room(connection)
             payload = deepcopy(data)
             payload.setdefault("id", uuid.uuid4().hex)
@@ -183,6 +205,8 @@ class Storage:
             if not product.get("id"):
                 product["id"] = payload["id"]
             existing = connection.execute("SELECT data FROM products WHERE id=?", (product["id"],)).fetchone()
+            if existing is None and connection.execute("SELECT COUNT(*) FROM products").fetchone()[0] >= MAX_PRODUCTS:
+                raise ValidationError(f"The wishlist supports at most {MAX_PRODUCTS} products.")
             previous = json.loads(existing["data"]) if existing else None
             connection.execute("INSERT INTO products(id,data) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data", (product["id"], json.dumps(product)))
             # A user-entered quote is useful immediately, with explicitly entered shipping.
@@ -213,12 +237,16 @@ class Storage:
                 raise KeyError("That product does not exist.")
 
     @staticmethod
-    def _insert_observation(connection, room, product, observation, notify=True) -> dict:
-        observations = Storage._observations(connection, product["id"])
+    def _insert_observation(connection, room, product, observation, notify=True, *, sequence=None) -> dict:
+        observations = Storage._observations(connection, product["id"]) if notify else []
         previous = evaluate_product(room, product, observations[0]) if observations else None
-        sequence = connection.execute("SELECT COALESCE(MAX(sequence), 0)+1 AS value FROM observations").fetchone()["value"]
+        if sequence is None:
+            sequence = connection.execute("SELECT COALESCE(MAX(sequence), 0)+1 AS value FROM observations").fetchone()["value"]
         identity = uuid.uuid4().hex
         connection.execute("INSERT INTO observations VALUES (?,?,?,?)", (identity, product["id"], json.dumps(observation), sequence))
+        if not notify:
+            # Restoring a journal does not replay checks or alert calculations.
+            return {**observation, "id": identity, "product_id": product["id"]}
         latest = Storage._observations(connection, product["id"])[0]
         current = evaluate_product(room, product, latest)
         changed = previous is None or not previous.get("eligible") or previous.get("delivered_eur") != current.get("delivered_eur")
@@ -268,7 +296,9 @@ class Storage:
             plain = {key: value for key, value in product.items() if key not in dynamic}
             plain["observations"] = [{key: value for key, value in observation.items() if key not in ("id", "product_id")} for observation in reversed(product["observations"])]
             products.append(plain)
-        return {"schema_version": 3, "room": state["room"], "products": products, "flat": state["flat"]}
+        payload = {"schema_version": 3, "room": state["room"], "products": products, "flat": state["flat"]}
+        validate_backup_size(payload)
+        return payload
 
     def export_csv(self) -> str:
         output = io.StringIO(newline="")
@@ -292,6 +322,7 @@ class Storage:
     def import_data(self, payload: dict) -> dict:
         if not isinstance(payload, dict):
             raise ValidationError("The backup must be an object.")
+        validate_backup_size(payload)
         version = payload.get("schema_version", 1)
         if isinstance(version, bool) or not isinstance(version, int) or version not in (1, 2, 3):
             raise ValidationError("This export version is not supported.")
@@ -306,8 +337,8 @@ class Storage:
         flat = validate_flat(payload["flat"]) if version >= 2 else None
         room = validate_room(payload.get("room"))
         entries = payload.get("products", [])
-        if not isinstance(entries, list) or len(entries) > 100:
-            raise ValidationError("Import supports at most 100 wishlist products.")
+        if not isinstance(entries, list):
+            raise ValidationError("Wishlist products must be a list.")
         prepared = []
         identities = set()
         for entry in entries:
@@ -319,14 +350,16 @@ class Storage:
                 raise ValidationError("An imported product contains unknown fields.")
             observations = product_data.pop("observations", [])
             product_data.setdefault("id", uuid.uuid4().hex)
-            product = validate_product(product_data, room)
+            # Deleting a reservation intentionally leaves its find in the journal.
+            # Preserve that link in a backup; ordinary product edits stay strict.
+            product = validate_product(product_data, room, allow_missing_reservation=True)
             identity = product.get("id") or product_data["id"]
             if identity in identities:
                 raise ValidationError("Imported product IDs must be unique.")
             product["id"] = identity
             identities.add(identity)
-            if not isinstance(observations, list) or len(observations) > 1000:
-                raise ValidationError("Each product supports at most 1000 imported observations.")
+            if not isinstance(observations, list):
+                raise ValidationError("A product's observations must be a list.")
             allowed_observation = {"price_eur", "shipping_eur", "availability", "source", "source_url", "observed_at", "note", "notes", "currency", "variant_confirmed", "is_demo", "product_name", "sku", "color", "product_signature", "requested_product_url"}
             if any(not isinstance(observation, dict) or set(observation) - allowed_observation for observation in observations):
                 raise ValidationError("An imported observation contains unknown fields.")
@@ -337,10 +370,12 @@ class Storage:
             connection.execute("UPDATE room SET data=? WHERE id=1", (json.dumps(room),))
             if flat is not None:
                 connection.execute("UPDATE flat SET data=? WHERE id=1", (json.dumps(flat),))
+            sequence = 0
             for product, observations in prepared:
                 connection.execute("INSERT INTO products(id,data) VALUES(?,?)", (product["id"], json.dumps(product)))
                 for observation in observations:
-                    self._insert_observation(connection, room, product, observation, notify=False)
+                    sequence += 1
+                    self._insert_observation(connection, room, product, observation, notify=False, sequence=sequence)
         return self.state()
 
     def reset(self) -> dict:

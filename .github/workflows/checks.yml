@@ -46,5 +46,10 @@ jobs:
           test -n "$browser_path"
           echo "ROOMMATE_BROWSER_PATH=$browser_path" >> "$GITHUB_ENV"
       - run: npm run test:browser
+      - run: npm run test:regressions
       - run: python scripts/build_browser.py
       - run: npm run test:public
+      - name: Recheck frontend regressions in the public build
+        run: npm run test:regressions
+        env:
+          ROOMIES_STATIC_DIR: dist

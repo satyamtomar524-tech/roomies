@@ -1,8 +1,11 @@
 import copy
 import csv
+from concurrent.futures import ThreadPoolExecutor
 import io
+import json
 from datetime import datetime, timedelta, timezone
 import tempfile
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
@@ -13,7 +16,7 @@ from tests.test_household import household_data
 
 
 def product_data(**extra):
-    return {"name": "A practical desk", "item_id": "desk", "url": "https://example.com/desk", "width_cm": 100, "depth_cm": 50, "height_cm": 70, "price_eur": 70, "shipping_eur": 5, "target_eur": 100, "availability": "in_stock", "variant_confirmed": True, "monitor": True, **extra}
+    return {"name": "A practical desk", "item_id": "desk", "url": "https://example.com/desk", "width_cm": 110, "depth_cm": 50, "height_cm": 70, "price_eur": 70, "shipping_eur": 5, "target_eur": 100, "availability": "in_stock", "variant_confirmed": True, "monitor": True, **extra}
 
 
 class StorageTests(unittest.TestCase):
@@ -201,6 +204,111 @@ class StorageTests(unittest.TestCase):
         self.storage.reset()
         self.storage.import_data(exported)
         self.assertEqual(self.storage.export(), exported)
+
+    def test_own_backup_restores_more_than_one_thousand_observations(self):
+        product = self.storage.save_product(product_data(price_eur=None))
+        seeded = self.storage.export()
+        observed_at = datetime.now(timezone.utc).isoformat()
+        seeded["products"][0]["observations"] = [
+            {"price_eur": 70, "observed_at": observed_at, "note": f"Quote {index}"}
+            for index in range(1000)
+        ]
+        self.storage.import_data(seeded)
+        self.storage.add_observation(product["id"], {
+            "price_eur": 60, "observed_at": observed_at, "note": "Newest quote",
+            "shipping_eur": 5, "availability": "in_stock", "variant_confirmed": True,
+        })
+        exported = self.storage.export()
+        self.assertEqual(len(exported["products"][0]["observations"]), 1001)
+        self.storage.reset()
+        restored = self.storage.import_data(exported)
+        self.assertEqual(self.storage.export(), exported)
+        self.assertEqual(restored["products"][0]["latest_observation"]["note"], "Newest quote")
+        self.assertEqual(restored["notifications"], [])
+
+    def test_json_backup_limit_preserves_saved_data_and_never_truncates(self):
+        self.storage.save_product(product_data())
+        before = self.storage.export()
+        limit = len(json.dumps(before, indent=2, ensure_ascii=False).encode("utf-8")) - 1
+        with patch("roommate.storage.MAX_BACKUP_BYTES", limit, create=True):
+            with self.assertRaisesRegex(ValueError, "backup.*limit"):
+                self.storage.export()
+            with self.assertRaisesRegex(ValueError, "backup.*limit"):
+                self.storage.import_data(before)
+        self.assertEqual(self.storage.export(), before)
+
+    def test_own_backup_restores_a_product_with_a_removed_reservation(self):
+        product = self.storage.save_product(product_data())
+        room = self.storage.state()["room"]
+        room["items"] = [item for item in room["items"] if item["id"] not in ("desk", "lamp")]
+        self.storage.save_room(room)
+        exported = self.storage.export()
+        self.storage.reset()
+        restored = self.storage.import_data(exported)
+        self.assertEqual(self.storage.export(), exported)
+        restored_product = restored["products"][0]
+        self.assertEqual(restored_product["item_id"], "desk")
+        self.assertFalse(restored_product["evaluation"]["eligible"])
+        self.assertIn("Link this product to a planned space before checking its fit.", restored_product["evaluation"]["reasons"])
+        with self.assertRaisesRegex(ValueError, "reservation that exists"):
+            self.storage.save_product(product_data(id=product["id"]))
+        for item_id in (17, "x" * 101):
+            invalid = copy.deepcopy(exported)
+            invalid["products"][0]["item_id"] = item_id
+            with self.subTest(item_id=item_id):
+                with self.assertRaises(ValueError):
+                    self.storage.import_data(invalid)
+                self.assertEqual(self.storage.export(), exported)
+
+    def test_explicit_ids_cannot_bypass_the_product_creation_limit(self):
+        backup = self.storage.export()
+        backup["products"] = [{"id": f"product-{index}", "name": f"Product {index}"} for index in range(100)]
+        self.storage.import_data(backup)
+        before = self.storage.export()
+        with self.assertRaisesRegex(ValueError, "at most 100 products"):
+            self.storage.save_product({"id": "explicit-bypass", "name": "One extra product"})
+        self.assertEqual(self.storage.export(), before)
+        self.storage.save_product({"id": "product-0", "name": "Updated existing product"})
+        self.assertEqual(len(self.storage.state()["products"]), 100)
+
+    def test_grandfathered_product_backups_restore_without_truncation(self):
+        legacy = self.storage.export()
+        legacy["products"] = [{"id": f"legacy-{index}", "name": f"Legacy product {index}"} for index in range(101)]
+        self.storage.import_data(legacy)
+        exported = self.storage.export()
+        self.storage.reset()
+        self.storage.import_data(exported)
+        self.assertEqual(self.storage.export(), exported)
+        self.storage.save_product({"id": "legacy-0", "name": "Existing legacy edit"})
+        with self.assertRaisesRegex(ValueError, "at most 100 products"):
+            self.storage.save_product({"id": "extra", "name": "Extra product"})
+        self.storage.delete_product("legacy-100")
+        with self.assertRaisesRegex(ValueError, "at most 100 products"):
+            self.storage.save_product({"id": "extra", "name": "Extra product"})
+        self.storage.delete_product("legacy-99")
+        self.storage.save_product({"id": "extra", "name": "Extra product"})
+        self.assertEqual(len(self.storage.state()["products"]), 100)
+
+    def test_concurrent_creations_cannot_overfill_the_last_product_slot(self):
+        backup = self.storage.export()
+        backup["products"] = [{"id": f"product-{index}", "name": f"Product {index}"} for index in range(99)]
+        self.storage.import_data(backup)
+        ready = threading.Barrier(2)
+
+        def create(identity):
+            ready.wait(timeout=5)
+            try:
+                return self.storage.save_product({"id": identity, "name": identity})
+            except ValueError as error:
+                return error
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            pending = [executor.submit(create, identity) for identity in ("first", "second")]
+            results = [future.result(timeout=10) for future in pending]
+        self.assertEqual(sum(isinstance(result, dict) for result in results), 1)
+        errors = [str(result) for result in results if isinstance(result, ValueError)]
+        self.assertEqual(errors, ["The wishlist supports at most 100 products."])
+        self.assertEqual(len(self.storage.state()["products"]), 100)
 
     def test_unchanged_product_edit_does_not_refresh_quote(self):
         product = self.storage.save_product(product_data())

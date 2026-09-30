@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from .geometry import analyse_room, find_positions
 from .household import summarize_flat
 from .pricing import fetch_price
-from .storage import Storage
+from .storage import MAX_BACKUP_BYTES, Storage
 
 
 SOURCE_ROOT = Path(__file__).resolve().parent.parent
@@ -117,7 +117,7 @@ class RequestHandler(BaseHTTPRequestHandler):
     def _json(self, status: int, payload: dict):
         self._reply(status, json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8"), "application/json; charset=utf-8")
 
-    def _body(self) -> dict:
+    def _body(self, maximum: int = MAX_BODY_BYTES) -> dict:
         if self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json":
             raise ValueError("Send this request as application/json.")
         if self.headers.get("Transfer-Encoding"):
@@ -129,8 +129,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             length = int(lengths[0])
         except ValueError as error:
             raise ValueError("Content-Length is invalid.") from error
-        if not 0 < length <= MAX_BODY_BYTES:
-            raise ValueError("The request must contain JSON smaller than 2 MiB.")
+        if not 0 < length <= maximum:
+            raise ValueError(f"The request must contain JSON no larger than {maximum // (1024 * 1024)} MiB.")
         self.connection.settimeout(15)
         raw = self.rfile.read(length)
         self._body_consumed = True
@@ -255,7 +255,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             storage.mark_notification(unquote(parts[3]))
             self._json(200, {"read": parts[3]})
         elif method == "POST" and path == "/api/import":
-            self._json(200, self.server.state(storage.import_data(self._body())))
+            self._json(200, self.server.state(storage.import_data(self._body(MAX_BACKUP_BYTES))))
         elif method == "POST" and path == "/api/reset":
             self._body()
             self._json(200, self.server.state(storage.reset()))

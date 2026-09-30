@@ -4,6 +4,7 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const SVG_NS = "http://www.w3.org/2000/svg";
+const MAX_BACKUP_BYTES = 32 * 1024 * 1024;
 const euro = new Intl.NumberFormat("en-DE", {
   style: "currency",
   currency: "EUR",
@@ -23,6 +24,8 @@ let dragging = null;
 let settingsOpenings = [];
 let currentView = "home";
 let productEditId = null;
+// Incomplete input belongs to its item until the user repairs or removes it.
+const itemDrafts = new Map();
 
 function node(tag, attributes = {}, text = null) {
   const element = document.createElement(tag);
@@ -114,7 +117,8 @@ function friendlyDate(value) {
 }
 
 async function api(path, options = {}) {
-  if (window.roomiesBrowser) return window.roomiesBrowser.request(path, options);
+  if (window.roomiesBrowser)
+    return window.roomiesBrowser.request(path, options);
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json" },
     ...options,
@@ -150,9 +154,24 @@ function toast(message, error = false) {
 }
 
 function setSaveStatus(message, kind = "saved") {
+  if (kind === "saved" && itemDrafts.size) {
+    message = "Room edits not saved · fix invalid fields";
+    kind = "error";
+  } else if (kind === "saved" && flatSaveError) {
+    message = "Flat changes not saved · try again";
+    kind = "error";
+  } else if (
+    kind === "saved" &&
+    (flatSavingPromise || savedRevision < mutationRevision)
+  ) {
+    message = "Saving your changes…";
+    kind = "saving";
+  }
   $("#save-status").textContent = message;
   $("#connection-dot").className =
     `status-dot${kind === "error" ? " error" : kind === "saving" ? " saving" : ""}`;
+  if (kind === "saved" && $("#backup-recovery"))
+    $("#backup-recovery").hidden = true;
 }
 
 function markDirty(delay = 450) {
@@ -171,45 +190,51 @@ async function flushRoom() {
   if (!state || savedRevision === mutationRevision) return;
   if (savingPromise) return savingPromise;
   savingPromise = (async () => {
-    while (savedRevision < mutationRevision) {
-      const revision = mutationRevision;
-      const payload = JSON.parse(JSON.stringify(state.room));
-      try {
-        const result = await api("/api/room", {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        });
-        savedRevision = revision;
-        if (revision === mutationRevision) {
-          state.summary = result.summary || result.analysis || state.summary;
-          renderMetrics();
-          renderRoomIssues();
-          renderInventory();
-          renderItemIssues();
-          renderPlan();
-          renderHome();
+    while (true) {
+      while (savedRevision < mutationRevision) {
+        const revision = mutationRevision;
+        const payload = JSON.parse(JSON.stringify(state.room));
+        try {
+          const result = await api("/api/room", {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          });
+          savedRevision = revision;
+          if (revision === mutationRevision) {
+            state.summary = result.summary || result.analysis || state.summary;
+            renderMetrics();
+            renderRoomIssues();
+            renderInventory();
+            renderItemIssues();
+            renderPlan();
+            renderHome();
+          }
+        } catch (error) {
+          setSaveStatus("Not saved · try your edit again", "error");
+          showBackupRecovery(error);
+          throw error;
         }
-      } catch (error) {
-        setSaveStatus("Not saved · try your edit again", "error");
-        throw error;
       }
-    }
-    setSaveStatus("All changes saved locally");
-    const revision = mutationRevision;
-    try {
-      const refreshed = await api("/api/state");
-      if (revision === mutationRevision) {
-        state.products = refreshed.products || [];
-        state.notifications = refreshed.notifications || [];
-        state.tracker = refreshed.tracker;
-        renderWishlist();
-        renderJournal();
+      const revision = mutationRevision;
+      try {
+        const refreshed = await api("/api/state");
+        if (revision === mutationRevision) {
+          state.products = refreshed.products || [];
+          state.notifications = refreshed.notifications || [];
+          state.tracker = refreshed.tracker;
+          renderWishlist();
+          renderJournal();
+        }
+      } catch {
+        toast(
+          "Your room was saved. The wishlist refresh failed; refresh the page to retry.",
+          true,
+        );
       }
-    } catch {
-      toast(
-        "Your room was saved. The wishlist refresh failed; refresh the page to retry.",
-        true,
-      );
+      // A debounced call can join this promise during the read. Save edits it added.
+      if (savedRevision < mutationRevision) continue;
+      setSaveStatus("All changes saved locally");
+      break;
     }
   })();
   try {
@@ -537,6 +562,8 @@ function drawFurniture(group, item, w, d, thumbnail = false) {
 
 function renderPlan(focusId = null) {
   if (!state) return;
+  focusId ||=
+    document.activeElement?.closest?.(".furniture-group")?.dataset.itemId;
   const svg = $("#room-plan"),
     room = state.room;
   const width = Number(room.width_cm),
@@ -925,6 +952,11 @@ function pointerInRoom(event) {
 function beginDrag(event, item) {
   if (event.button !== 0) return;
   event.preventDefault();
+  if (itemDrafts.has(item.id)) {
+    selectItem(item.id, false);
+    toast("Fix this item's invalid fields before moving it.", true);
+    return;
+  }
   if (item.locked) {
     selectItem(item.id, false);
     toast(
@@ -1011,6 +1043,10 @@ function itemKeydown(event, item) {
     return;
   event.preventDefault();
   selectedId = item.id;
+  if (itemDrafts.has(item.id)) {
+    toast("Fix this item's invalid fields before moving it.", true);
+    return;
+  }
   if (item.locked) return;
   if (increments[event.key]) {
     const [x, y] = increments[event.key];
@@ -1069,6 +1105,13 @@ function renderInspector() {
     ),
   );
   form.elements.parent_id.value = item.parent_id || "";
+  const draft = itemDrafts.get(item.id);
+  if (draft)
+    for (const [key, value] of Object.entries(draft)) {
+      const input = form.elements.namedItem(key);
+      if (input.type === "checkbox") input.checked = value;
+      else input.value = value;
+    }
   updatePlacementFields();
   $("#rotation-value").textContent = `Rotation ${item.rotation || 0}°`;
   renderItemIssues();
@@ -1088,6 +1131,16 @@ function renderItemIssues() {
     item = itemById(selectedId);
   root.replaceChildren();
   if (!item) return;
+  if (itemDrafts.has(item.id)) {
+    root.append(
+      node(
+        "p",
+        {},
+        "These edits are not saved. Correct the invalid fields; your draft is kept when you select another item.",
+      ),
+    );
+    return;
+  }
   if (savedRevision < mutationRevision) {
     root.append(
       node("p", {}, "Your latest position has not been saved and checked yet."),
@@ -1180,6 +1233,19 @@ function renderRoomIssues() {
   const issues = state.summary?.issues || [],
     list = $("#room-issues");
   list.replaceChildren();
+  if (itemDrafts.size) {
+    $("#room-check-heading").textContent = "Room edits need attention";
+    $("#room-check-icon").textContent = "!";
+    $("#room-check-icon").classList.add("warning");
+    list.append(
+      node(
+        "p",
+        { class: "muted" },
+        "Some item fields are invalid. Their drafts are kept, but the plan still uses the last valid values.",
+      ),
+    );
+    return;
+  }
   if (savedRevision < mutationRevision) {
     $("#room-check-heading").textContent = "Checking your changes";
     $("#room-check-icon").textContent = "…";
@@ -1251,7 +1317,24 @@ function updateItemFromForm() {
   const form = $("#item-form"),
     item = itemById(selectedId);
   if (!item) return;
-  if (!form.checkValidity()) return;
+  if (!form.checkValidity()) {
+    itemDrafts.set(
+      item.id,
+      Object.fromEntries(
+        [...form.elements]
+          .filter((input) => input.name)
+          .map((input) => [
+            input.name,
+            input.type === "checkbox" ? input.checked : input.value,
+          ]),
+      ),
+    );
+    setSaveStatus("Room edits not saved · fix invalid fields", "error");
+    renderItemIssues();
+    renderRoomIssues();
+    return;
+  }
+  itemDrafts.delete(item.id);
   for (const key of [
     "name",
     "category",
@@ -1286,15 +1369,30 @@ function updateItemFromForm() {
 
 async function suggestPositions() {
   if (!selectedId) return;
+  const requestedId = selectedId;
+  if (itemDrafts.has(requestedId)) {
+    $("#item-form").reportValidity();
+    toast("Fix this item's invalid fields before requesting positions.", true);
+    return;
+  }
   const button = $("#suggest-positions"),
     root = $("#suggestions");
   button.disabled = true;
   try {
     await flushRoom();
+    if (selectedId !== requestedId) return;
+    const requestedRevision = mutationRevision;
     const result = await api("/api/suggest", {
       method: "POST",
-      body: JSON.stringify({ item_id: selectedId }),
+      body: JSON.stringify({ item_id: requestedId }),
     });
+    if (
+      selectedId !== requestedId ||
+      mutationRevision !== requestedRevision ||
+      itemDrafts.has(requestedId) ||
+      !itemById(requestedId)
+    )
+      return;
     root.replaceChildren();
     root.hidden = false;
     if (!result.placements?.length)
@@ -1320,9 +1418,17 @@ async function suggestPositions() {
         placement.reasons?.join(" ") ||
         "A position that passes the defined room checks.";
       option.append(node("span", {}, reason));
-      const itemId = selectedId;
       option.addEventListener("click", () => {
-        const item = itemById(itemId);
+        if (
+          selectedId !== requestedId ||
+          mutationRevision !== requestedRevision ||
+          itemDrafts.has(requestedId)
+        ) {
+          root.hidden = true;
+          toast("The room changed. Request new positions for this item.");
+          return;
+        }
+        const item = itemById(requestedId);
         if (!item) return;
         Object.assign(item, {
           x_cm: placement.x_cm,
@@ -1746,16 +1852,101 @@ async function checkProduct(productId, button) {
 
 async function downloadData(path) {
   try {
-    await flushRoom();
-    await flushFlat();
-    if (window.roomiesBrowser) await window.roomiesBrowser.download(path);
-    else window.location.href = path;
+    if (itemDrafts.size)
+      throw new Error(
+        "Correct the invalid item fields to include your latest room edits.",
+      );
+    do {
+      await flushRoom();
+      await flushFlat({ requireSaved: true });
+    } while (savedRevision < mutationRevision || flatSavingPromise);
+    if (itemDrafts.size)
+      throw new Error(
+        "Correct the invalid item fields to include your latest room edits.",
+      );
   } catch (error) {
+    showBackupRecovery(error);
     toast(
       `Export stopped because your latest changes could not be saved. ${error.message}`,
       true,
     );
+    return;
   }
+  try {
+    await downloadExport(path);
+  } catch (error) {
+    toast(`Export failed. ${error.message}`, true);
+  }
+}
+
+async function downloadExport(path) {
+  if (window.roomiesBrowser) return window.roomiesBrowser.download(path);
+  const response = await fetch(path);
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(
+      data.error || `The export request failed (${response.status}).`,
+    );
+  }
+  const format = new URL(path, window.location.href).searchParams.get("format");
+  const filename =
+    {
+      csv: "roomies-price-history.csv",
+      expenses: "roomies-expense-shares.csv",
+      repayments: "roomies-repayments.csv",
+    }[format] || "roomies-backup.json";
+  const url = URL.createObjectURL(await response.blob());
+  const link = node("a", { href: url, download: filename });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function showBackupRecovery(error) {
+  let recovery = $("#backup-recovery");
+  if (!recovery) {
+    recovery = node("div", {
+      id: "backup-recovery",
+      class: "sample-note",
+      role: "alert",
+    });
+    const content = node("div");
+    content.append(
+      node(
+        "p",
+        {},
+        "Latest edits are not saved. This backup contains only the last saved workspace and excludes those edits.",
+      ),
+    );
+    const button = node(
+      "button",
+      { type: "button", class: "small-button", id: "export-saved-backup" },
+      "Export last saved backup",
+    );
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await downloadExport("/api/export?format=json");
+        toast(
+          "Last saved backup exported. Your latest edits are still unsaved.",
+          true,
+        );
+      } catch (failure) {
+        toast(
+          `The last saved backup could not be exported. ${failure.message}`,
+          true,
+        );
+      } finally {
+        button.disabled = false;
+      }
+    });
+    content.append(button);
+    recovery.append(content);
+    $("#data-dialog .data-actions").before(recovery);
+  }
+  recovery.hidden = false;
+  recovery.title = error.message;
 }
 
 function renderWishlist() {
@@ -1908,8 +2099,16 @@ function openProduct(itemId = null, editId = null) {
   const form = $("#product-form");
   form.reset();
   productEditId = editId;
+  const product = productById(editId);
   const products = state.room.items.filter((item) => item.status === "planned");
-  const options = products.length ? products : state.room.items;
+  const options = products.length
+    ? state.room.items.filter(
+        (item) =>
+          item.status === "planned" ||
+          item.id === product?.item_id ||
+          item.id === itemId,
+      )
+    : state.room.items;
   form.elements.item_id.replaceChildren(
     node("option", { value: "" }, "Choose a reserved place"),
     ...options.map((item) =>
@@ -1926,7 +2125,6 @@ function openProduct(itemId = null, editId = null) {
   $("#product-dialog-title").textContent = editId
     ? "The details of this find"
     : "Add a find";
-  const product = productById(editId);
   if (product) {
     for (const key of [
       "name",
@@ -2530,9 +2728,9 @@ async function readImport(event) {
   $("#import-error").hidden = true;
   if (!file) return;
   try {
-    if (file.size > 2_000_000)
+    if (file.size > MAX_BACKUP_BYTES)
       throw new Error(
-        "This file is larger than 2 MB. Use a Roomies JSON export.",
+        "This backup is larger than 32 MiB. Roomies backups must stay within 32 MiB.",
       );
     const data = JSON.parse(await file.text());
     if (
@@ -2562,14 +2760,20 @@ async function confirmImport() {
   const button = $("#confirm-import");
   button.disabled = true;
   try {
-    await flushRoom();
-    await flushFlat();
+    // Confirmed replacement can recover from a failed save; drain active writes first.
+    await flushRoom().catch(() => {});
+    await flushFlat().catch(() => {});
     await api("/api/import", {
       method: "POST",
       body: JSON.stringify(importCandidate),
     });
     selectedId = null;
     selectedJournalId = null;
+    itemDrafts.clear();
+    mutationRevision += 1;
+    savedRevision = mutationRevision;
+    if (importCandidate.schema_version >= 2 && importCandidate.flat)
+      flatSaveError = null;
     await reload();
     $("#data-dialog").close();
     toast(
@@ -2605,6 +2809,10 @@ function wireEvents() {
   $("#rotate-item").addEventListener("click", () => {
     const item = itemById(selectedId);
     if (!item) return;
+    if (itemDrafts.has(item.id)) {
+      toast("Fix this item's invalid fields before rotating it.", true);
+      return;
+    }
     item.rotation = Number(item.rotation) === 90 ? 0 : 90;
     renderAll();
     markDirty();
@@ -2631,6 +2839,7 @@ function wireEvents() {
     state.room.items = state.room.items.filter(
       (candidate) => candidate.id !== item.id,
     );
+    itemDrafts.delete(item.id);
     selectedId = state.room.items[0]?.id || null;
     renderAll();
     markDirty();
@@ -2742,7 +2951,12 @@ function wireEvents() {
   $("#import-file").addEventListener("change", readImport);
   $("#confirm-import").addEventListener("click", confirmImport);
   window.addEventListener("beforeunload", (event) => {
-    if (savedRevision < mutationRevision || flatSavingPromise) {
+    if (
+      savedRevision < mutationRevision ||
+      flatSavingPromise ||
+      flatSaveError ||
+      itemDrafts.size
+    ) {
       event.preventDefault();
       event.returnValue = "";
     }

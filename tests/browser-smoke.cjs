@@ -127,7 +127,8 @@ async function main() {
 
     await page.locator('.navigation .nav-link[data-view="wishlist"]').click();
     await page.locator('#add-product').click();
-    for (const [name, value] of Object.entries({ name: 'Browser test desk', url: 'https://example.com/desk', target_price: '80', width_cm: '100', depth_cm: '50', height_cm: '73', color: 'Oak', variant: '100 × 50 cm, oak' })) {
+    // The planned lamp ends at X=105; this positive fixture must support it.
+    for (const [name, value] of Object.entries({ name: 'Browser test desk', url: 'https://example.com/desk', target_price: '80', width_cm: '110', depth_cm: '50', height_cm: '73', color: 'Oak', variant: '110 × 50 cm, oak' })) {
       await field('#product-form', name).fill(value);
     }
     await field('#product-form', 'item_id').selectOption('desk');

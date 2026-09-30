@@ -37,9 +37,11 @@ The position suggestion search checks modeled candidates and returns up to five 
 
 ## Product fit
 
-A product is linked to a planned item. Width, depth, and height must be known. The entered dimensions must fit the reservation in the allowed modeled orientation. Relevant placement conflicts prevent a positive buying signal. A product linked to an owned item does not count as a new planned reservation.
+A product is linked to a planned item. Width, depth, and height must be known. The entered dimensions must fit the reservation in the allowed modeled orientation. Relevant placement conflicts prevent a positive buying signal. For a desk or cabinet with surface items, the actual product must also support their saved locations in an allowed orientation. A product linked to an owned item does not count as a new planned reservation.
 
 Wall, floor and item colours appear in the plan; style is an explicit note. These are schematic colours, not a lighting or material simulation. The application does not infer that an item will improve someone's mood or objectively match a room. Verify the chosen variant and its dimensions against the actual product page.
+
+The room's budget note is saved for reference. Product checks compare a delivered price with that product's target; they do not calculate an overall upgrade budget or total affordability.
 
 ## Price observations
 
@@ -102,6 +104,8 @@ Monthly templates store the usual amount, payer, participant order and due day. 
 ## Backups
 
 Schema 3 exports contain the room, products, observations and complete flat, including repayments and monthly templates. Import validation completes before replacement, so rejected data cannot erase the existing workspace. Schema 1 room-only imports leave the current flat unchanged. Schema 2 imports restore the flat records present in that backup; missing repayments and monthly bills become empty lists. The import preview warns about this before confirmation. Resetting the sample room preserves the flat. Imports do not replay historical price notifications.
+
+Import and export support up to 32 MiB of UTF-8 JSON in the exported format. The same limit applies in both directions. Oversized workspaces report an error and retain all saved records. Backups can restore long observation histories and finds whose reservation was deleted; those finds remain ineligible until relinked. New product creation stops at 100 finds, including concurrent requests, but older backups beyond that count can be restored and edited without truncation.
 
 Expense CSV has one row per participant share. The expense's total repeats on each row: do not sum that total column across participant rows. Sum `share_cents` for allocated amounts, or count each expense ID once for expense totals.
 

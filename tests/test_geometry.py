@@ -151,6 +151,33 @@ class GeometryTests(unittest.TestCase):
             self.item("desk").update({key: suggestion[key] for key in ("x_cm", "y_cm", "rotation")})
             self.assertTrue(analyse_room(self.room)["valid"])
 
+    def test_suggestions_find_exact_gap_between_obstacles_and_door_zones(self):
+        for wall in ("north", "south", "east", "west"):
+            for kind in ("obstacle", "door"):
+                with self.subTest(wall=wall, kind=kind):
+                    vertical_gap = wall in ("north", "south")
+                    room = {
+                        "width_cm": 100, "depth_cm": 100,
+                        "openings": [
+                            {"id": "first", "kind": kind, "wall": wall,
+                             "offset_cm": 0, "width_cm": 13, "depth_cm": 100},
+                            {"id": "second", "kind": kind, "wall": wall,
+                             "offset_cm": 23, "width_cm": 77, "depth_cm": 100},
+                        ],
+                        "items": [{"id": "shelf", "name": "Shelf",
+                                   "width_cm": 10 if vertical_gap else 100,
+                                   "depth_cm": 100 if vertical_gap else 10}],
+                    }
+                    before = copy.deepcopy(room)
+                    suggestions = find_positions(room, "shelf")
+                    self.assertTrue(suggestions)
+                    self.assertEqual(room, before)
+                    for suggestion in suggestions:
+                        placed = copy.deepcopy(room)
+                        placed["items"][0].update({key: suggestion[key] for key in ("x_cm", "y_cm", "rotation")})
+                        self.assertTrue(analyse_room(placed)["valid"])
+                        self.assertEqual(suggestion["x_cm"] if vertical_gap else suggestion["y_cm"], 13)
+
     def test_oversized_item_has_no_suggestion(self):
         self.item("desk").update(width_cm=400, depth_cm=400)
         self.assertEqual(find_positions(self.room, "desk"), [])

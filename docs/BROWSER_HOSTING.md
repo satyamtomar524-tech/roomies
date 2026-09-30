@@ -24,7 +24,7 @@ python scripts/build_browser.py
 python -m http.server 8841 --bind 127.0.0.1 --directory dist
 ```
 
-Open `http://127.0.0.1:8841/`. The build downloads a pinned Pyodide package, verifies its SHA-512, and copies only allowlisted code and assets into `dist`. No database, backup, token or environment file is copied. Its runtime archive is cached under `build/runtime-cache` for later builds. Both folders are ignored by Git.
+Open `http://127.0.0.1:8841/`. The build downloads a pinned Pyodide package, verifies its SHA-512, and copies only allowlisted code and assets into `dist`. A rebuild rejects extra files and filesystem links before changing the output. If it reports an unexpected file, inspect it and choose a fresh output directory; the builder preserves that file. Its runtime archive is cached under `build/runtime-cache` for later builds. Both folders are ignored by Git.
 
 The contents of `dist` can be hosted as static files over HTTPS. Assets use relative paths, so a project subdirectory works too. Serve `.wasm` as `application/wasm` and `.mjs` as JavaScript. Runtime files are served from the same origin; visitors do not need a CDN or an API key.
 
@@ -40,12 +40,15 @@ The Sites deployment has a separate generated checkout. Its `.openai/hosting.jso
 
 One editor tab is allowed per browser profile and origin. A second tab explains how to continue instead of overwriting a stale copy. Other visitors have independent storage. A read-only WebMCP overview is registered only in browsers that provide that optional API; the ordinary UI needs no AI integration.
 
+JSON backups support up to 32 MiB of the exported UTF-8 format. Import and export use the same limit; an oversized workspace reports an error and keeps every saved record. Price histories do not have a separate import-only observation cap. If a save fails, the data menu offers **Export last saved backup**. That recovery copy excludes unsaved edits, and its label says so.
+
 ## Check it
 
 Install the optional development dependency with `npm install`, build `dist`, then run:
 
 ```sh
 npm run test:public
+npm run test:regressions
 ```
 
 The test serves only static files and blocks external page requests. It checks room edits, flat records, kitchen stock, exact-cent costs, repayments, monthly templates, manual prices, exports/imports, reload persistence, independent visitor storage, a second editor tab, a simulated storage failure and phone widths. It reuses the local app's repayment and monthly-bill workflow. The optional WebMCP registration is tested with a mock; actual agent integration is not verified.

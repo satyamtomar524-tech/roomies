@@ -192,11 +192,11 @@ async function main() {
       name: "Small desk",
       url: "https://example.com/desk",
       target_price: "80",
-      width_cm: "100",
+      width_cm: "110",
       depth_cm: "50",
       height_cm: "73",
       color: "Oak",
-      variant: "100 by 50 cm",
+      variant: "110 by 50 cm",
     }))
       await field("#product-form", key).fill(value);
     await field("#product-form", "item_id").selectOption("desk");

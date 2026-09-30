@@ -118,11 +118,11 @@ def _public_url(url: str) -> tuple[str, str]:
     return clean, host
 
 
-def validate_product(data: dict[str, Any], room: dict[str, Any]) -> dict[str, Any]:
+def validate_product(data: dict[str, Any], room: dict[str, Any], *, allow_missing_reservation: bool = False) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("Product must be an object.")
     item_id = _text(data.get("item_id"), "item_id", limit=100)
-    if item_id and not any(item.get("id") == item_id for item in room.get("items", [])):
+    if item_id and not allow_missing_reservation and not any(item.get("id") == item_id for item in room.get("items", [])):
         raise ValueError("Choose a reservation that exists in this room.")
     url = _text(data.get("url"), "url", limit=4096)
     if url:
@@ -230,11 +230,29 @@ def evaluate_product(room: dict[str, Any], product: dict[str, Any], observation:
             rotated = product.get("rotation_allow90", True) and item.get("placement") != "wall" and depth <= slot_width and width <= slot_depth
             fit = "pass" if (straight or rotated) and height <= slot_height else "fail"
             reasons.append("Fits the reserved dimensions." if fit == "pass" else "The product exceeds this reservation's dimensions.")
-        relevant_ids = {item.get("id"), item.get("parent_id")}
+        children = [child for child in room.get("items", []) if child.get("placement") == "surface" and child.get("parent_id") == item.get("id")]
+        child_ids = {child.get("id") for child in children}
+        relevant_ids = {item.get("id"), item.get("parent_id")} | child_ids
         errors = [issue for issue in analyse_room(room)["issues"] if issue.get("severity") == "error" and (issue.get("item_id") in relevant_ids or issue.get("item_id") is None)]
         if errors:
             fit = "fail"
             reasons.append("Resolve this reservation's layout conflict before buying: " + errors[0]["message"])
+        elif fit == "pass" and children:
+            # A smaller desk can fit its reservation while stranding its lamp.
+            # Keep local surface coordinates and check every allowed orientation.
+            support_errors = []
+            for extra_rotation, fits_dimensions in ((0, straight), (90, rotated)):
+                if not fits_dimensions:
+                    continue
+                actual_item = {**item, "width_cm": width, "depth_cm": depth, "height_cm": height,
+                               "rotation": (item["rotation"] + extra_rotation) % 180}
+                actual_room = {**room, "items": [actual_item if other.get("id") == item.get("id") else other for other in room["items"]]}
+                support_errors = [issue for issue in analyse_room(actual_room)["issues"] if issue["severity"] == "error" and issue.get("item_id") in child_ids]
+                if not support_errors:
+                    break
+            if support_errors:
+                fit = "fail"
+                reasons.append("This product cannot support the saved surface layout: " + support_errors[0]["message"])
 
     quote = observation or {}
     price, shipping = quote.get("price_eur"), quote.get("shipping_eur")

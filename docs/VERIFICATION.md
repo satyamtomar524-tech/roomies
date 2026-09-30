@@ -1,12 +1,12 @@
 # Verification record
 
-Checked on 30 September 2026 for Roomies 2.2. This records local evidence. Remote results are available in the repository's [workflow run history](https://github.com/satyamtomar524-tech/roomies/actions).
+Checked on 30 September 2026 for Roomies 2.2.1. This records local evidence. Remote results are available in the repository's [workflow run history](https://github.com/satyamtomar524-tech/roomies/actions).
 
 ## Results
 
 | Check | Result |
 |---|---|
-| Python behavioral suite | **186 passed** on Python 3.12.14 / Windows |
+| Python behavioral suite | **203 passed** on Python 3.12.14 / Windows |
 | JavaScript syntax | Passed with Node 24.19.0 |
 | Complete browser workflow | Passed using Playwright 1.62.1 and isolated headless Chrome 154.0.8037.58 |
 | Responsive pages | No horizontal overflow in all seven views at 320 px and 390 px; expense, repayment and monthly-bill dialog controls remain reachable |
@@ -14,8 +14,9 @@ Checked on 30 September 2026 for Roomies 2.2. This records local evidence. Remot
 | Public static build | Passed using self-hosted Pyodide 314.0.7 / Python 3.14.2; the browser made no HTTP API or external requests |
 | Browser storage | Saves survive reload; independent visitors have separate records; a second editor tab is blocked; a simulated IndexedDB write failure restores the previous database |
 | Browser exports and costs | Full JSON backup/restore, price records, repayments and monthly-bill workflow passed through the static transport |
+| Frontend regression loop | **10 cases passed in each transport**: local HTTP and the generated public build with real Pyodide/IndexedDB |
 | Visual inspection | Desktop and mobile home, room and kitchen screens, a narrow expense dialog, and a clearly fictional shared-cost example inspected |
-| Python distribution | Version 2.1 wheel was checked in the previous release; the 2.2 local source workflow passed. A fresh 2.2 wheel installation has not been checked |
+| Python distribution | Version 2.1 wheel was checked in the previous release; the 2.2.1 local source workflow passed. A fresh 2.2.1 wheel installation has not been checked |
 
 The Python suite covers geometry, prices, HTTP/API routes, SQLite persistence, scheduling, household validation and shared expenses. The browser check uses a fresh disposable database, synthetic belongings, people, bills, products and prices, and a stopped scheduler. It does not contact a retailer or modify the user's workspace.
 
@@ -44,6 +45,7 @@ Browser tooling is optional; the application itself needs only Python. On a mach
 npm install --ignore-scripts
 npx playwright install chromium
 npm run test:browser
+npm run test:regressions
 ```
 
 On Linux, Playwright may need `npx playwright install --with-deps chromium`. `ROOMMATE_PYTHON` selects a Python executable. `ROOMMATE_BROWSER_PATH` can select an installed Chrome/Chromium executable instead of the downloaded browser. The test starts and stops its own localhost server and writes only under ignored `test-results/`.
@@ -51,6 +53,12 @@ On Linux, Playwright may need `npx playwright install --with-deps chromium`. `RO
 GitHub Actions is configured for Python 3.10, 3.12 and 3.13, JavaScript syntax, and a Chromium browser workflow. Only Python 3.12 was executed locally; the other Python versions are covered by the remote workflow.
 
 The browser job uses Chrome already installed on the Ubuntu 24.04 runner, selected through `ROOMMATE_BROWSER_PATH`. This runs the same smoke test without installing a second browser and its operating-system dependencies. The [runner's software inventory](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md) documents its available browser.
+
+## Check, fix, recheck
+
+For this review I reproduced each issue with disposable data, kept the failing case as a regression, changed the relevant code, and reran that check. I then ran the complete Python suite and both browser workflows. A passing check records the tested behavior; it does not prove that every possible room or browser is covered.
+
+`node tests/frontend-regressions.cjs` checks focus after autosave, edits during a delayed refresh, stale position suggestions, purchased-item links, invalid drafts, large backup restore, failed-save recovery, edits during export, concurrent room/flat save status, and export errors. Set `ROOMIES_STATIC_DIR` to `dist` to repeat the same cases through the browser worker. GitHub Actions runs both modes after building the public app.
 
 ## Important regressions covered
 
@@ -74,6 +82,12 @@ The browser job uses Chrome already installed on the Ubuntu 24.04 runner, select
 - Schema 3 backups require the new lists. Older open tabs preserve omitted new lists when saving; legacy flat imports explicitly restore only the records in their backup.
 - Failed public checks retain the old observation but cannot turn it into a current purchase signal.
 - Local request checks, private-address rejection, redirect validation, crawling restrictions, response limits and ambiguous structured offers are exercised.
+- Fixed obstacle and inward-door edges contribute candidate positions, including valid gaps between grid points.
+- A smaller supporting product cannot pass while leaving a saved surface object outside its actual dimensions.
+- Own backups restore histories beyond 1,000 observations, products whose reservation was removed, and older workspaces beyond the current product-creation limit.
+- Import and export share a 32 MiB UTF-8 JSON limit. Oversized exports report an error without truncating or deleting saved records.
+- New product creation respects the 100-product limit for explicit IDs and concurrent writers; existing finds remain editable.
+- Builds reject extra files and filesystem links before modifying an existing output directory, rather than carrying private files into a deployment.
 
 ## Limits of this evidence
 

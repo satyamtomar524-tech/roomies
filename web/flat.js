@@ -2,11 +2,13 @@
 "use strict";
 
 let flatSavingPromise = null;
+let flatSaveError = null;
 let flatRevision = 0;
 let flatMembersDraft = [];
 
-async function flushFlat() {
+async function flushFlat({ requireSaved = false } = {}) {
   while (flatSavingPromise) await flatSavingPromise;
+  if (requireSaved && flatSaveError) throw flatSaveError;
 }
 
 function ensureHousehold() {
@@ -103,19 +105,22 @@ async function updateFlat(mutate) {
     flatRevision += 1;
     state.flat = result.flat;
     state.flat_summary = result.flat_summary;
+    flatSaveError = null;
     renderHousehold();
-    if (savedRevision === mutationRevision)
-      setSaveStatus("All changes saved locally");
     return result;
   })();
   flatSavingPromise = operation;
   try {
     return await operation;
   } catch (error) {
+    flatSaveError = error;
     setSaveStatus("Flat changes not saved · try again", "error");
+    showBackupRecovery(error);
     throw error;
   } finally {
     if (flatSavingPromise === operation) flatSavingPromise = null;
+    if (!flatSaveError && savedRevision === mutationRevision)
+      setSaveStatus("All changes saved locally");
   }
 }
 

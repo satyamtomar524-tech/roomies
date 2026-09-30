@@ -174,6 +174,53 @@ class DecisionTests(unittest.TestCase):
         product.update(item_id="lamp-space", width_cm=15, depth_cm=15, height_cm=40)
         self.assertFalse(pricing.evaluate_product(room, product, quote_fixture())["eligible"])
 
+    def test_supporting_product_is_blocked_by_its_surface_child_conflict(self):
+        room = room_fixture()
+        room["items"].append({"id": "lamp", "name": "Lamp", "placement": "surface",
+                              "parent_id": "desk-space", "status": "planned",
+                              "x_cm": 115, "y_cm": 0, "width_cm": 20, "depth_cm": 20, "height_cm": 30})
+        result = pricing.evaluate_product(room, product_fixture(), quote_fixture())
+        self.assertEqual(result["fit"], "fail")
+        self.assertFalse(result["eligible"])
+        self.assertFalse(result["can_price_drop_notice"])
+
+    def test_smaller_supporting_product_must_preserve_surface_locations(self):
+        for rotation in (0, 90):
+            with self.subTest(rotation=rotation):
+                room = room_fixture()
+                room["items"][0]["rotation"] = rotation
+                room["items"].append({"id": "lamp", "name": "Lamp", "placement": "surface",
+                                      "parent_id": "desk-space", "status": "planned",
+                                      "x_cm": 105 if rotation == 0 else 0,
+                                      "y_cm": 0 if rotation == 0 else 105,
+                                      "width_cm": 15, "depth_cm": 15, "height_cm": 30})
+                before = copy.deepcopy(room)
+                result = pricing.evaluate_product(room, product_fixture(), quote_fixture())
+                self.assertEqual(result["fit"], "fail")
+                self.assertFalse(result["eligible"])
+                self.assertFalse(result["can_price_drop_notice"])
+                self.assertEqual(room, before)
+
+    def test_supporting_product_uses_an_allowed_orientation_that_keeps_children(self):
+        room = room_fixture()
+        room["items"][0]["depth_cm"] = 120
+        room["items"].append({"id": "lamp", "name": "Lamp", "placement": "surface",
+                              "parent_id": "desk-space", "status": "planned",
+                              "x_cm": 20, "y_cm": 80, "width_cm": 20, "depth_cm": 20, "height_cm": 30})
+        product = product_fixture()
+        self.assertTrue(pricing.evaluate_product(room, product, quote_fixture())["eligible"])
+        product["rotation_allow90"] = False
+        self.assertFalse(pricing.evaluate_product(room, product, quote_fixture())["eligible"])
+
+    def test_smaller_supporting_product_keeps_valid_surface_layout_eligible(self):
+        room = room_fixture()
+        room["items"].append({"id": "lamp", "name": "Lamp", "placement": "surface",
+                              "parent_id": "desk-space", "status": "planned",
+                              "x_cm": 80, "y_cm": 5, "width_cm": 20, "depth_cm": 20, "height_cm": 30})
+        before = copy.deepcopy(room)
+        self.assertTrue(pricing.evaluate_product(room, product_fixture(), quote_fixture())["eligible"])
+        self.assertEqual(room, before)
+
     def test_demo_never_becomes_live_recommendation(self):
         product = product_fixture()
         product["is_demo"] = True

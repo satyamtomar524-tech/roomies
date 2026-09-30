@@ -1,11 +1,12 @@
 {
   "name": "roomies-browser-checks",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "private": true,
   "description": "Optional browser checks for Roomies local and static builds.",
   "scripts": {
     "test:browser": "node tests/browser-smoke.cjs",
     "test:public": "node tests/browser-public.cjs",
+    "test:regressions": "node tests/frontend-regressions.cjs",
     "check": "node --check web/app.js && node --check web/flat.js && node --check web/costs.js && node --check web/browser.js && node --check web/browser-worker.mjs"
   },
   "devDependencies": {

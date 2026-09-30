@@ -313,6 +313,14 @@ def find_positions(room: dict, item_id: str) -> list[dict]:
             gap = max(item["clearance_cm"], other["clearance_cm"])
             xs.update((x - item_width - gap, x + other_width + gap))
             ys.update((y - item_depth - gap, y + other_depth + gap))
+        if item["placement"] == "floor":
+            # Exact gaps beside fixed zones can fall between the search grid.
+            for opening in room["openings"]:
+                if opening["kind"] != "obstacle" and not (opening["kind"] == "door" and opening["swing"] == "in"):
+                    continue
+                x, y, zone_width, zone_depth = opening_rectangle(room, opening)
+                xs.update((x - item_width, x + zone_width))
+                ys.update((y - item_depth, y + zone_depth))
         for x in sorted(value for value in xs if 0 <= value <= width - item_width):
             for y in sorted(value for value in ys if 0 <= value <= depth - item_depth):
                 item["x_cm"], item["y_cm"] = x, y
